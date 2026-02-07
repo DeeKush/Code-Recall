@@ -1,70 +1,141 @@
 // ==========================================
-// LOCAL STORAGE UTILITIES
+// FIRESTORE STORAGE UTILITIES (Day 2 Update)
 // ==========================================
-// These functions handle saving and loading snippets from localStorage.
-// 
-// WHY SEPARATE FILE?
-// This makes it easy to swap localStorage for Firebase later.
-// Just change these functions, and the rest of the app stays the same!
+// These functions handle saving and loading snippets from Firestore.
+// Migrated from localStorage to cloud storage for better persistence.
 // ==========================================
 
-// Key prefix for localStorage
-// Each user has their own snippets stored under their user ID
-const STORAGE_KEY_PREFIX = "code_recall_snippets_";
+import { db } from "../firebase";
+import {
+    collection,
+    addDoc,
+    getDocs,
+    query,
+    orderBy,
+    Timestamp
+} from "firebase/firestore";
 
 /**
- * Get all snippets for a specific user
- * @param {string} userId - The user's unique ID from Firebase
- * @returns {Array} - Array of snippet objects
+ * Helper function to add a timeout to any promise
+ * Prevents operations from hanging forever
+ * @param {Promise} promise - The promise to wrap
+ * @param {number} ms - Timeout in milliseconds
+ * @returns {Promise} - Rejects if timeout exceeded
  */
-export function getSnippets(userId) {
-    // Create the storage key for this user
-    const key = STORAGE_KEY_PREFIX + userId;
-
-    // Get the data from localStorage (returns null if nothing saved)
-    const data = localStorage.getItem(key);
-
-    // If no data exists, return empty array
-    // Otherwise, parse the JSON string back into an array
-    return data ? JSON.parse(data) : [];
+function withTimeout(promise, ms) {
+    const timeout = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Operation timed out")), ms);
+    });
+    return Promise.race([promise, timeout]);
 }
 
 /**
- * Save a new snippet for a specific user
+ * Get all snippets for a specific user from Firestore
+ * @param {string} userId - The user's unique ID from Firebase
+ * @returns {Promise<Array>} - Array of snippet objects
+ */
+export async function getSnippets(userId) {
+    // DEBUG: Log the user ID
+    console.log("[DEBUG] getSnippets called with userId:", userId);
+
+    try {
+        // Reference to this user's snippets collection
+        // Path: users/{userId}/snippets
+        const snippetsRef = collection(db, "users", userId, "snippets");
+
+        // Query snippets, ordered by creation date (newest first)
+        const q = query(snippetsRef, orderBy("createdAt", "desc"));
+
+        // Fetch the documents
+        console.log("[DEBUG] Fetching documents from Firestore...");
+        const querySnapshot = await getDocs(q);
+        console.log("[DEBUG] Documents fetched, count:", querySnapshot.size);
+
+        // Convert Firestore documents to plain JavaScript objects
+        const snippets = [];
+        querySnapshot.forEach((doc) => {
+            snippets.push({
+                id: doc.id,  // Firestore document ID
+                ...doc.data()  // All the snippet data
+            });
+        });
+
+        console.log("[DEBUG] Snippets loaded:", snippets);
+        return snippets;
+    } catch (error) {
+        console.error("[ERROR] Error fetching snippets:", error);
+        console.error("[ERROR] Error code:", error.code);
+        console.error("[ERROR] Error message:", error.message);
+        return [];
+    }
+}
+
+/**
+ * Save a new snippet for a specific user to Firestore
  * @param {string} userId - The user's unique ID from Firebase
  * @param {Object} snippet - The snippet object to save
- * @returns {Object} - The saved snippet (with generated ID and timestamp)
+ * @returns {Promise<Object>} - The saved snippet with generated ID
  */
-export function saveSnippet(userId, snippet) {
-    // Get existing snippets for this user
-    const snippets = getSnippets(userId);
+export async function saveSnippet(userId, snippet) {
+    // DEBUG: Log save attempt
+    console.log("[DEBUG] saveSnippet called with userId:", userId);
+    console.log("[DEBUG] Snippet data to save:", snippet);
 
-    // Create the new snippet with auto-generated ID and timestamp
-    const newSnippet = {
-        id: generateId(),           // Unique identifier
-        title: snippet.title,       // User-provided title
-        topic: snippet.topic,       // User-provided topic
-        code: snippet.code,         // The actual code content
-        createdAt: new Date().toISOString()  // When it was created
-    };
+    try {
+        // Create a readable date string like "2026-02-08 19:42"
+        const now = new Date();
+        const readableDate = formatDate(now);
 
-    // Add new snippet to the beginning of the array (newest first)
-    const updatedSnippets = [newSnippet, ...snippets];
+        // Prepare the snippet data
+        const snippetData = {
+            title: snippet.title,
+            topic: snippet.topic,
+            code: snippet.code,
+            tags: snippet.tags || [],  // NEW: tags array
+            createdAt: Timestamp.fromDate(now),  // Firestore Timestamp
+            createdAtReadable: readableDate  // Human-readable string
+        };
 
-    // Save back to localStorage (must convert to JSON string)
-    const key = STORAGE_KEY_PREFIX + userId;
-    localStorage.setItem(key, JSON.stringify(updatedSnippets));
+        console.log("[DEBUG] Prepared snippetData:", snippetData);
 
-    // Return the new snippet so the app can use it immediately
-    return newSnippet;
+        // Reference to this user's snippets collection
+        const snippetsRef = collection(db, "users", userId, "snippets");
+
+        // Add the document to Firestore WITH TIMEOUT (10 seconds max)
+        // This prevents the save button from staying locked forever
+        console.log("[DEBUG] Adding document to Firestore (10s timeout)...");
+        const docRef = await withTimeout(addDoc(snippetsRef, snippetData), 10000);
+        console.log("[DEBUG] Document added successfully! ID:", docRef.id);
+
+        // Return the complete snippet with ID for immediate use
+        return {
+            id: docRef.id,
+            ...snippetData
+        };
+    } catch (error) {
+        console.error("[ERROR] Error saving snippet:", error);
+        console.error("[ERROR] Error code:", error.code);
+        console.error("[ERROR] Error message:", error.message);
+
+        // If it's a timeout, give a more helpful message
+        if (error.message === "Operation timed out") {
+            throw new Error("Save timed out. Please check your Firestore security rules in Firebase Console.");
+        }
+        throw error;
+    }
 }
 
 /**
- * Generate a simple unique ID
- * In production, you might use a library like 'uuid'
- * But for Day 1 MVP, this simple approach works fine
+ * Format a date as "YYYY-MM-DD HH:MM"
+ * @param {Date} date - The date to format
+ * @returns {string} - Formatted date string
  */
-function generateId() {
-    // Combine timestamp with random number for uniqueness
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
 }

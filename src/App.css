@@ -370,6 +370,172 @@ body {
   word-break: break-word;
 }
 
+/* ---------- Code Container with Copy Button ---------- */
+.code-container {
+  position: relative;
+}
+
+.btn-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 0.35rem 0.75rem;
+  background-color: rgba(255, 255, 255, 0.15);
+  color: var(--code-text);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.btn-copy:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* ---------- Search and Filter Bar (Day 2) ---------- */
+.search-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 2rem;
+  background-color: var(--card-background);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.search-input-wrapper {
+  flex: 1;
+  max-width: 400px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.date-filter-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-filter-wrapper label {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+.date-input {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.btn-clear {
+  padding: 0.3rem 0.6rem;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.btn-clear:hover {
+  background-color: var(--error-color);
+  color: white;
+  border-color: var(--error-color);
+}
+
+/* ---------- Tag Chips (Day 2) ---------- */
+.snippet-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background-color: #e8f0fe;
+  color: var(--primary-color);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.detail-tags {
+  margin-top: 0.75rem;
+}
+
+.detail-tags .tag-chip {
+  font-size: 0.85rem;
+  padding: 0.2rem 0.65rem;
+}
+
+/* ---------- Snippet Preview (Day 2) ---------- */
+.snippet-preview {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: var(--code-background);
+  border-radius: 4px;
+  overflow: hidden;
+  max-height: 60px;
+}
+
+.snippet-preview code {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.75rem;
+  color: var(--code-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------- Date Display (Day 2) ---------- */
+.snippet-date {
+  color: var(--text-light);
+  font-size: 0.8rem;
+}
+
+/* ---------- Loading and Empty States (Day 2) ---------- */
+.snippet-list.loading {
+  color: var(--text-light);
+  text-align: center;
+  padding: 2rem;
+}
+
+.empty-hint {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  margin-top: 0.5rem;
+}
+
+.filter-hint {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  margin-bottom: 0.75rem;
+}
+
 /* ---------- Responsive Design ---------- */
 @media (max-width: 1024px) {
   .dashboard-main {

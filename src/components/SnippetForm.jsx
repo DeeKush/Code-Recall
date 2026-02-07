@@ -1,39 +1,48 @@
 // ==========================================
-// SNIPPET FORM COMPONENT
+// SNIPPET FORM COMPONENT (Day 2 Update)
 // ==========================================
-// A simple form for creating new code snippets.
-// Has three fields: title, topic, and code.
+// Form for creating new code snippets.
+// Now includes: title, topic, tags (comma-separated), and code.
 // ==========================================
 
 import { useState } from "react";
 
-function SnippetForm({ onSave }) {
+function SnippetForm({ onSave, saving }) {
     // Form state - each field has its own state
     const [title, setTitle] = useState("");
     const [topic, setTopic] = useState("");
+    const [tags, setTags] = useState("");  // NEW: comma-separated tags input
     const [code, setCode] = useState("");
 
     // Handle form submission
     function handleSubmit(e) {
         e.preventDefault();
 
-        // Basic validation - make sure all fields have content
+        // Basic validation - make sure required fields have content
         if (!title.trim() || !topic.trim() || !code.trim()) {
-            alert("Please fill in all fields.");
+            alert("Please fill in title, topic, and code.");
             return;
         }
 
+        // Parse tags: split by comma, trim whitespace, filter empty strings
+        // Example: "dp, arrays, prefix sum" → ["dp", "arrays", "prefix sum"]
+        const tagsArray = tags
+            .split(",")
+            .map(tag => tag.trim())
+            .filter(tag => tag.length > 0);
+
         // Call the onSave function passed from Dashboard
-        // This will save the snippet to localStorage
         onSave({
             title: title.trim(),
             topic: topic.trim(),
-            code: code.trim()
+            code: code.trim(),
+            tags: tagsArray  // NEW: pass tags array
         });
 
         // Clear the form after saving
         setTitle("");
         setTopic("");
+        setTags("");
         setCode("");
     }
 
@@ -63,6 +72,18 @@ function SnippetForm({ onSave }) {
                 />
             </div>
 
+            {/* NEW: Tags input field */}
+            <div className="form-group">
+                <label htmlFor="tags">Tags (comma separated)</label>
+                <input
+                    type="text"
+                    id="tags"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="e.g., dp, arrays, prefix sum"
+                />
+            </div>
+
             <div className="form-group">
                 <label htmlFor="code">Code</label>
                 <textarea
@@ -74,8 +95,8 @@ function SnippetForm({ onSave }) {
                 />
             </div>
 
-            <button type="submit" className="btn-primary">
-                Save Snippet
+            <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? "Saving..." : "Save Snippet"}
             </button>
         </form>
     );

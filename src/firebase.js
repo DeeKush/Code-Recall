@@ -2,15 +2,14 @@
 // FIREBASE CONFIGURATION
 // ==========================================
 // This file sets up Firebase for our app.
-// You need to replace the placeholder values with your actual Firebase config.
-// Go to: Firebase Console > Project Settings > Your Apps > Web App
+// Includes: Authentication, Google Sign-In, and Firestore Database
 // ==========================================
 
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // Your Firebase configuration object
-// IMPORTANT: Replace these values with your actual Firebase project config!
 const firebaseConfig = {
   apiKey: "AIzaSyBGZFhBNBATF9tO4f75jodQf7_bzCvBkaQ",
   authDomain: "code-recall.firebaseapp.com",
@@ -24,11 +23,15 @@ const firebaseConfig = {
 // Initialize Firebase app
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Authentication and export it
-// We'll use this 'auth' object throughout our app for login/signup/logout
+// Initialize Firebase Authentication
 export const auth = getAuth(app);
 
 // Initialize Google Auth Provider for Google Sign-In
 export const googleProvider = new GoogleAuthProvider();
 
+// Initialize Firestore Database (NEW for Day 2)
+// We'll use this to store snippets in the cloud
+export const db = getFirestore(app);
+
 export default app;
+
