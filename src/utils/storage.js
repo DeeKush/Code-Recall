@@ -12,7 +12,9 @@ import {
     getDocs,
     query,
     orderBy,
-    Timestamp
+    Timestamp,
+    doc,
+    updateDoc
 } from "firebase/firestore";
 
 /**
@@ -87,13 +89,15 @@ export async function saveSnippet(userId, snippet) {
         const readableDate = formatDate(now);
 
         // Prepare the snippet data
+        // Now supports AI-generated title, topic, aiTags from Day 3
         const snippetData = {
-            title: snippet.title,
-            topic: snippet.topic,
+            title: snippet.title,                    // AI-generated title
+            topic: snippet.topic,                    // AI-generated topic
             code: snippet.code,
-            tags: snippet.tags || [],  // NEW: tags array
-            createdAt: Timestamp.fromDate(now),  // Firestore Timestamp
-            createdAtReadable: readableDate  // Human-readable string
+            tags: snippet.tags || [],                // User tags (empty for Day 3)
+            aiTags: snippet.aiTags || [],            // AI-generated tags
+            createdAt: Timestamp.fromDate(now),      // Firestore Timestamp
+            createdAtReadable: readableDate          // Human-readable string
         };
 
         console.log("[DEBUG] Prepared snippetData:", snippetData);
@@ -138,4 +142,42 @@ function formatDate(date) {
     const minutes = String(date.getMinutes()).padStart(2, "0");
 
     return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+/**
+ * Update a snippet with AI-generated data (Day 3)
+ * Called after snippet is saved and Gemini returns data
+ * @param {string} userId - The user's unique ID
+ * @param {string} snippetId - The Firestore document ID
+ * @param {Object} aiData - The AI-generated data { aiTags, aiNotes }
+ * @param {string} status - "success" or "failed"
+ * @returns {Promise<Object>} - The AI data that was saved
+ */
+export async function updateSnippetAI(userId, snippetId, aiData, status) {
+    console.log("[DEBUG] updateSnippetAI called for snippet:", snippetId);
+
+    try {
+        // Reference to the specific snippet document
+        const snippetRef = doc(db, "users", userId, "snippets", snippetId);
+
+        // Prepare the AI notes data to update
+        // Day 3: Only updates notes (aiTags saved in initial save)
+        const updateData = {
+            aiNotes: aiData?.aiNotes || null,
+            aiGeneratedAt: Timestamp.fromDate(new Date()),
+            aiStatus: status  // "success" or "failed"
+        };
+
+        console.log("[DEBUG] Updating with AI data:", updateData);
+
+        // Update the document with timeout
+        await withTimeout(updateDoc(snippetRef, updateData), 10000);
+
+        console.log("[DEBUG] AI data saved successfully!");
+
+        return updateData;
+    } catch (error) {
+        console.error("[ERROR] Failed to update snippet with AI data:", error);
+        throw error;
+    }
 }
