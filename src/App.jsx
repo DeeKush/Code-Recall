@@ -1,12 +1,15 @@
 // ==========================================
-// MAIN APP COMPONENT
+// MAIN APP COMPONENT (Day 4 - Dark Dashboard)
 // ==========================================
-// The root component of our application.
-// Handles routing between auth screens and dashboard.
+// Routes between:
+//   - Home (landing page)
+//   - Login / Signup
+//   - Dashboard
 // ==========================================
 
 import { useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import Home from "./components/Home";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import Dashboard from "./components/Dashboard";
@@ -17,13 +20,14 @@ function AppContent() {
   // Get auth state from context
   const { user, loading } = useAuth();
 
-  // State to track which auth screen to show (login or signup)
-  const [isLoginScreen, setIsLoginScreen] = useState(true);
+  // State for navigation
+  const [currentPage, setCurrentPage] = useState("home"); // home, login, signup
 
   // Show loading screen while checking auth status
   if (loading) {
     return (
-      <div className="loading-screen">
+      <div className="loading-screen-dark">
+        <div className="loading-spinner"></div>
         <p>Loading...</p>
       </div>
     );
@@ -34,12 +38,30 @@ function AppContent() {
     return <Dashboard />;
   }
 
-  // If not logged in, show Login or Signup based on state
-  return isLoginScreen ? (
-    <Login onSwitchToSignup={() => setIsLoginScreen(false)} />
-  ) : (
-    <Signup onSwitchToLogin={() => setIsLoginScreen(true)} />
-  );
+  // Show appropriate page based on state
+  switch (currentPage) {
+    case "login":
+      return (
+        <Login
+          onSwitchToSignup={() => setCurrentPage("signup")}
+          onBackToHome={() => setCurrentPage("home")}
+        />
+      );
+    case "signup":
+      return (
+        <Signup
+          onSwitchToLogin={() => setCurrentPage("login")}
+          onBackToHome={() => setCurrentPage("home")}
+        />
+      );
+    default:
+      return (
+        <Home
+          onGetStarted={() => setCurrentPage("signup")}
+          onLogin={() => setCurrentPage("login")}
+        />
+      );
+  }
 }
 
 // Main App component wraps everything in AuthProvider

@@ -1,88 +1,107 @@
 // ==========================================
-// SNIPPET LIST COMPONENT (Day 2 Update)
+// SNIPPET LIST COMPONENT (Day 4 - Dark Theme)
 // ==========================================
-// Displays a list of all saved snippets.
-// NEW: Shows tags, code preview, loading state, and empty filter message.
+// Displays snippet cards with:
+//   - Dark card styling
+//   - Title, topic, date, tags
+//   - Selected state highlight
+//   - Skeleton loader
+//   - Empty state
 // ==========================================
 
-/**
- * Get the first N lines of code for preview
- * @param {string} code - The full code string
- * @param {number} lines - Number of lines to show
- * @returns {string} - First N lines of code
- */
-function getCodePreview(code, lines = 2) {
-    if (!code) return "";
-    const codeLines = code.split("\n");
-    const previewLines = codeLines.slice(0, lines);
-    // Add "..." if there are more lines
-    if (codeLines.length > lines) {
-        return previewLines.join("\n") + "\n...";
-    }
-    return previewLines.join("\n");
-}
+import { FileCode, Calendar, Tag, Inbox } from "lucide-react";
 
 function SnippetList({ snippets, selectedId, onSelect, loading }) {
-    // NEW: Show loading state while fetching
+    // Loading state - show skeleton
     if (loading) {
         return (
-            <div className="snippet-list loading">
-                <p>Loading snippets...</p>
+            <div className="snippet-list-dark">
+                {[1, 2, 3].map((i) => (
+                    <div key={i} className="snippet-card-skeleton">
+                        <div className="skeleton-line title"></div>
+                        <div className="skeleton-line topic"></div>
+                        <div className="skeleton-line tags"></div>
+                    </div>
+                ))}
             </div>
         );
     }
 
-    // Show message when no snippets exist at all
-    if (snippets.length === 0) {
+    // Empty state
+    if (!snippets || snippets.length === 0) {
         return (
-            <div className="snippet-list empty">
-                <p>No snippets found.</p>
-                <p className="empty-hint">Create your first snippet or adjust your search filters.</p>
+            <div className="snippet-list-empty">
+                <Inbox size={48} className="empty-icon" />
+                <p className="empty-title">No snippets yet</p>
+                <p className="empty-subtitle">Save your first code snippet to get started</p>
             </div>
         );
     }
 
     return (
-        <div className="snippet-list">
-            <h3>Your Snippets ({snippets.length})</h3>
+        <div className="snippet-list-dark">
+            {snippets.map((snippet) => {
+                const isSelected = selectedId === snippet.id;
 
-            <ul>
-                {/* Loop through each snippet and create a list item */}
-                {snippets.map((snippet) => (
-                    <li
+                return (
+                    <button
                         key={snippet.id}
-                        // Add 'selected' class if this snippet is currently selected
-                        className={`snippet-item ${selectedId === snippet.id ? "selected" : ""}`}
-                        // When clicked, call onSelect with this snippet
+                        className={`snippet-card-dark ${isSelected ? "selected" : ""}`}
                         onClick={() => onSelect(snippet)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                onSelect(snippet);
+                            }
+                        }}
+                        tabIndex={0}
+                        aria-selected={isSelected}
                     >
-                        {/* Title */}
-                        <span className="snippet-title">{snippet.title}</span>
+                        {/* Title row */}
+                        <div className="card-title-row">
+                            <FileCode size={16} className="card-icon" />
+                            <span className="card-title">
+                                {snippet.title || "Untitled Snippet"}
+                            </span>
+                        </div>
 
-                        {/* Topic and time */}
-                        <span className="snippet-topic">
-                            {snippet.topic}
-                            {snippet.createdAtReadable && (
-                                <span className="snippet-date"> • Saved at {snippet.createdAtReadable.split(" ")[1]}</span>
-                            )}
-                        </span>
+                        {/* Topic row */}
+                        <div className="card-topic">
+                            {snippet.topic || "No topic"}
+                        </div>
 
-                        {/* NEW: Tags as chips */}
+                        {/* Meta row - date */}
+                        <div className="card-meta">
+                            <Calendar size={12} />
+                            <span>
+                                {snippet.createdAtReadable?.split(" ")[0] || "Unknown date"}
+                            </span>
+                        </div>
+
+                        {/* Tags */}
                         {snippet.tags && snippet.tags.length > 0 && (
-                            <div className="snippet-tags">
-                                {snippet.tags.map((tag, index) => (
-                                    <span key={index} className="tag-chip">{tag}</span>
+                            <div className="card-tags">
+                                <Tag size={12} className="tag-icon" />
+                                {snippet.tags.slice(0, 3).map((tag, index) => (
+                                    <span key={index} className="tag-chip-dark">
+                                        {tag}
+                                    </span>
                                 ))}
+                                {snippet.tags.length > 3 && (
+                                    <span className="tag-more">+{snippet.tags.length - 3}</span>
+                                )}
                             </div>
                         )}
 
-                        {/* NEW: Code preview (first 2 lines) */}
-                        <pre className="snippet-preview">
-                            <code>{getCodePreview(snippet.code, 2)}</code>
-                        </pre>
-                    </li>
-                ))}
-            </ul>
+                        {/* Code preview */}
+                        <div className="card-preview">
+                            <code>
+                                {snippet.code?.slice(0, 80)}
+                                {snippet.code?.length > 80 ? "..." : ""}
+                            </code>
+                        </div>
+                    </button>
+                );
+            })}
         </div>
     );
 }

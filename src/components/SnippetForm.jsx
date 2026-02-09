@@ -1,7 +1,7 @@
 // ==========================================
-// SNIPPET FORM COMPONENT (Day 4 - Enhanced UX)
+// SNIPPET FORM COMPONENT (Day 4 - Dark Theme)
 // ==========================================
-// Two-step flow with improved UI:
+// Two-step flow with dark UI:
 //   1. User pastes code, clicks "Generate Details"
 //   2. AI generates metadata (with loading skeleton)
 //   3. Preview appears - user reviews/edits
@@ -9,7 +9,7 @@
 // ==========================================
 
 import { useState } from "react";
-import { Code, Sparkles, FileText, Tag, Loader, Check, X } from "lucide-react";
+import { Code, Sparkles, FileText, Tag, Loader, Check, X, Plus } from "lucide-react";
 import { generateSnippetMetadata } from "../utils/groq";
 
 function SnippetForm({ onSave, saving }) {
@@ -23,13 +23,12 @@ function SnippetForm({ onSave, saving }) {
     // Editable metadata fields
     const [title, setTitle] = useState("");
     const [topic, setTopic] = useState("");
-    const [tagsInput, setTagsInput] = useState("");  // Comma-separated string
+    const [tagsInput, setTagsInput] = useState("");
 
     // Step 1: Analyze code and show review panel
     async function handleAnalyze(e) {
         e.preventDefault();
 
-        // Validation
         if (!code.trim()) {
             alert("Please paste some code.");
             return;
@@ -43,17 +42,11 @@ function SnippetForm({ onSave, saving }) {
         setAnalyzing(true);
 
         try {
-            // Call AI to generate metadata
             const metadata = await generateSnippetMetadata(code);
-
-            // Pre-fill the review fields
             setTitle(metadata.title || "");
             setTopic(metadata.topic || "");
             setTagsInput((metadata.aiTags || []).join(", "));
-
-            // Show the review panel
             setShowReview(true);
-
         } catch (error) {
             console.error("Analysis failed:", error);
             alert("Failed to analyze code. Please try again.");
@@ -64,13 +57,11 @@ function SnippetForm({ onSave, saving }) {
 
     // Step 2: Save the snippet with reviewed metadata
     function handleSave() {
-        // Parse tags from comma-separated string
         const tagsArray = tagsInput
             .split(",")
             .map(tag => tag.trim())
             .filter(tag => tag.length > 0);
 
-        // Call onSave with the reviewed data
         onSave({
             code: code.trim(),
             title: title.trim(),
@@ -86,7 +77,7 @@ function SnippetForm({ onSave, saving }) {
         setShowReview(false);
     }
 
-    // Cancel review and go back to code input
+    // Cancel review
     function handleCancel() {
         setShowReview(false);
         setTitle("");
@@ -94,7 +85,7 @@ function SnippetForm({ onSave, saving }) {
         setTagsInput("");
     }
 
-    // Remove a single tag
+    // Remove a tag
     function handleRemoveTag(tagToRemove) {
         const currentTags = tagsInput
             .split(",")
@@ -109,183 +100,160 @@ function SnippetForm({ onSave, saving }) {
         .map(t => t.trim())
         .filter(t => t.length > 0);
 
-    // Check if save should be disabled
     const canSave = showReview && !saving && title.trim() && topic.trim();
 
     return (
-        <div className="snippet-form">
-            <h3>Save Code Snippet</h3>
-
-            {/* ======== SECTION 1: CODE INPUT ======== */}
-            <div className="form-section">
-                <div className="section-header">
-                    <Code size={18} className="section-icon" />
-                    <span>Code</span>
-                </div>
-
-                <div className="section-content">
-                    <div className="form-group">
-                        <textarea
-                            id="code"
-                            value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                            placeholder="Paste your DSA / competitive programming code here..."
-                            rows={8}
-                            disabled={analyzing || showReview}
-                        />
-                    </div>
-
-                    {/* Generate Details button - only show if not in review mode */}
-                    {!showReview && (
-                        <button
-                            type="button"
-                            className="btn-primary btn-generate"
-                            onClick={handleAnalyze}
-                            disabled={analyzing || !code.trim()}
-                        >
-                            {analyzing ? (
-                                <>
-                                    <Loader size={16} className="spinning" />
-                                    <span>Analyzing...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Sparkles size={16} />
-                                    <span>Generate Details</span>
-                                </>
-                            )}
-                        </button>
-                    )}
-                </div>
+        <div className="snippet-form-dark">
+            <div className="form-header-dark">
+                <Plus size={20} className="form-header-icon" />
+                <h3>New Snippet</h3>
             </div>
 
-            {/* ======== LOADING SKELETON ======== */}
+            {/* Code input section */}
+            <div className="form-section-dark">
+                <label className="form-label-dark">
+                    <Code size={16} />
+                    <span>Code</span>
+                </label>
+                <textarea
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Paste your code here..."
+                    rows={10}
+                    disabled={analyzing || showReview}
+                    className="form-textarea-dark"
+                />
+
+                {/* Generate button */}
+                {!showReview && (
+                    <button
+                        onClick={handleAnalyze}
+                        disabled={analyzing || !code.trim()}
+                        className="btn-generate-dark"
+                    >
+                        {analyzing ? (
+                            <>
+                                <Loader size={16} className="spinning" />
+                                <span>Analyzing...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles size={16} />
+                                <span>Generate Details</span>
+                            </>
+                        )}
+                    </button>
+                )}
+            </div>
+
+            {/* Loading skeleton */}
             {analyzing && (
-                <div className="form-section skeleton-section">
-                    <div className="section-header">
-                        <Sparkles size={18} className="section-icon" />
-                        <span>Generated Details</span>
-                    </div>
-                    <div className="section-content">
-                        <div className="skeleton-loading">
-                            <div className="skeleton-text">Understanding your code...</div>
-                            <div className="skeleton-block"></div>
-                            <div className="skeleton-block short"></div>
-                            <div className="skeleton-block shorter"></div>
-                        </div>
-                    </div>
+                <div className="form-section-dark skeleton-container">
+                    <div className="skeleton-text-dark">Understanding your code...</div>
+                    <div className="skeleton-block-dark"></div>
+                    <div className="skeleton-block-dark short"></div>
+                    <div className="skeleton-block-dark shorter"></div>
                 </div>
             )}
 
-            {/* ======== SECTION 2: GENERATED DETAILS (Review Panel) ======== */}
+            {/* Review section */}
             {showReview && !analyzing && (
-                <div className="form-section review-section">
-                    <div className="section-header">
-                        <Sparkles size={18} className="section-icon" />
+                <div className="form-section-dark review-section-dark">
+                    <div className="review-header-dark">
+                        <Sparkles size={16} />
                         <span>Generated Details</span>
-                        <span className="review-badge">Review & Edit</span>
+                        <span className="review-badge-dark">Review</span>
                     </div>
 
-                    <div className="section-content">
-                        <p className="review-hint">
-                            AI-generated metadata. Edit if needed before saving.
-                        </p>
+                    {/* Title */}
+                    <div className="form-field-dark">
+                        <label className="form-label-dark">
+                            <FileText size={14} />
+                            <span>Title</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Snippet title"
+                            className="form-input-dark"
+                        />
+                    </div>
 
-                        {/* Title Input */}
-                        <div className="form-group">
-                            <label htmlFor="title">
-                                <FileText size={14} className="label-icon" />
-                                Title
-                            </label>
-                            <input
-                                type="text"
-                                id="title"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="Snippet title"
-                            />
-                        </div>
+                    {/* Topic */}
+                    <div className="form-field-dark">
+                        <label className="form-label-dark">
+                            <FileText size={14} />
+                            <span>Topic</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={topic}
+                            onChange={(e) => setTopic(e.target.value)}
+                            placeholder="e.g., Binary Search, DP"
+                            className="form-input-dark"
+                        />
+                    </div>
 
-                        {/* Topic Input */}
-                        <div className="form-group">
-                            <label htmlFor="topic">
-                                <FileText size={14} className="label-icon" />
-                                Topic
-                            </label>
-                            <input
-                                type="text"
-                                id="topic"
-                                value={topic}
-                                onChange={(e) => setTopic(e.target.value)}
-                                placeholder="e.g., Binary Search, DP"
-                            />
-                        </div>
+                    {/* Tags */}
+                    <div className="form-field-dark">
+                        <label className="form-label-dark">
+                            <Tag size={14} />
+                            <span>Tags</span>
+                        </label>
 
-                        {/* Tags Editor */}
-                        <div className="form-group">
-                            <label htmlFor="tags">
-                                <Tag size={14} className="label-icon" />
-                                Tags
-                            </label>
+                        {parsedTags.length > 0 && (
+                            <div className="tag-editor-dark">
+                                {parsedTags.map((tag, index) => (
+                                    <span key={index} className="editable-tag-dark">
+                                        {tag}
+                                        <button
+                                            type="button"
+                                            className="tag-remove-dark"
+                                            onClick={() => handleRemoveTag(tag)}
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
 
-                            {/* Tag chips display */}
-                            {parsedTags.length > 0 && (
-                                <div className="tag-editor">
-                                    {parsedTags.map((tag, index) => (
-                                        <span key={index} className="editable-tag">
-                                            {tag}
-                                            <button
-                                                type="button"
-                                                className="tag-remove"
-                                                onClick={() => handleRemoveTag(tag)}
-                                                title="Remove tag"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
+                        <input
+                            type="text"
+                            value={tagsInput}
+                            onChange={(e) => setTagsInput(e.target.value)}
+                            placeholder="Add tags (comma separated)"
+                            className="form-input-dark"
+                        />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="review-actions-dark">
+                        <button
+                            onClick={handleSave}
+                            disabled={!canSave}
+                            className="btn-save-dark"
+                        >
+                            {saving ? (
+                                <>
+                                    <Loader size={16} className="spinning" />
+                                    <span>Saving...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Check size={16} />
+                                    <span>Confirm Save</span>
+                                </>
                             )}
-
-                            <input
-                                type="text"
-                                id="tags"
-                                value={tagsInput}
-                                onChange={(e) => setTagsInput(e.target.value)}
-                                placeholder="Add tags separated by commas"
-                                className="tag-input"
-                            />
-                        </div>
-
-                        {/* Action buttons */}
-                        <div className="review-actions">
-                            <button
-                                type="button"
-                                className="btn-primary btn-confirm"
-                                onClick={handleSave}
-                                disabled={!canSave}
-                            >
-                                {saving ? (
-                                    <>
-                                        <Loader size={16} className="spinning" />
-                                        <span>Saving...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Check size={16} />
-                                        <span>Confirm Save</span>
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                type="button"
-                                className="btn-secondary"
-                                onClick={handleCancel}
-                                disabled={saving}
-                            >
-                                Cancel
-                            </button>
-                        </div>
+                        </button>
+                        <button
+                            onClick={handleCancel}
+                            disabled={saving}
+                            className="btn-cancel-dark"
+                        >
+                            Cancel
+                        </button>
                     </div>
                 </div>
             )}

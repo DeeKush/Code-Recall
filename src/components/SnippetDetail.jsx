@@ -1,34 +1,59 @@
 // ==========================================
-// SNIPPET DETAIL COMPONENT (Collapsible Notes)
+// SNIPPET DETAIL COMPONENT (Day 4 - Tabbed Layout)
 // ==========================================
-// Shows snippet details with:
-//   - AI tags with badge
-//   - User tags (separate)
-//   - Collapsible AI notes sections
+// Split view with:
+//   - Top: Code editor panel
+//   - Bottom: Tabs (Details | AI Notes)
 // ==========================================
 
 import { useState } from "react";
+import {
+    Copy,
+    Check,
+    FileCode,
+    Tag,
+    Sparkles,
+    RefreshCw,
+    ChevronDown,
+    ChevronRight,
+    Target,
+    Lightbulb,
+    Wrench,
+    ListOrdered,
+    Clock,
+    HardDrive,
+    AlertTriangle,
+    Key,
+    Calendar,
+    Info,
+    BookOpen
+} from "lucide-react";
 
-// Collapsible section component
-function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
+// Collapsible accordion component with description
+function AccordionSection({ title, description, icon: Icon, children, defaultOpen = false }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
     return (
-        <div className={`collapsible-section ${isOpen ? "open" : ""}`}>
+        <div className={`accordion-card ${isOpen ? "open" : ""}`}>
             <button
-                className="collapsible-header"
+                className="accordion-header"
                 onClick={() => setIsOpen(!isOpen)}
                 type="button"
+                aria-expanded={isOpen}
             >
-                <span className="collapsible-title">
-                    {icon} {title}
-                </span>
-                <span className="collapsible-arrow">
-                    {isOpen ? "▼" : "▶"}
-                </span>
+                <div className="accordion-title-group">
+                    <Icon size={18} className="accordion-icon" />
+                    <div className="accordion-text">
+                        <span className="accordion-title">{title}</span>
+                        {description && !isOpen && (
+                            <span className="accordion-desc">{description}</span>
+                        )}
+                    </div>
+                </div>
+                {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
             </button>
             {isOpen && (
-                <div className="collapsible-content">
+                <div className="accordion-content">
                     {children}
                 </div>
             )}
@@ -38,6 +63,7 @@ function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
 
 function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
     const [copied, setCopied] = useState(false);
+    const [activeTab, setActiveTab] = useState("details");
 
     function handleCopyCode() {
         if (snippet?.code) {
@@ -46,175 +72,217 @@ function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                 })
-                .catch((err) => {
-                    console.error("Failed to copy:", err);
-                    alert("Failed to copy code.");
-                });
+                .catch((err) => console.error("Failed to copy:", err));
         }
     }
 
+    // Empty state - no snippet selected
     if (!snippet) {
         return (
-            <div className="snippet-detail empty">
-                <p>Select a snippet to view its details</p>
+            <div className="detail-empty">
+                <FileCode size={56} className="empty-icon" />
+                <p className="empty-title">No snippet selected</p>
+                <p className="empty-subtitle">Select a snippet from the list to view its code and AI notes</p>
             </div>
         );
     }
 
+    // AI notes sections config
+    const noteSections = [
+        { key: "problem", title: "Problem", desc: "What is being solved", icon: Target, open: true },
+        { key: "intuition", title: "Intuition", desc: "The key insight", icon: Lightbulb, open: true },
+        { key: "approach", title: "Approach", desc: "Strategy used", icon: Wrench },
+        { key: "algorithmSteps", title: "Algorithm Steps", desc: "Step-by-step breakdown", icon: ListOrdered },
+        { key: "timeComplexity", title: "Time Complexity", desc: "Big O analysis", icon: Clock },
+        { key: "spaceComplexity", title: "Space Complexity", desc: "Memory usage", icon: HardDrive },
+        { key: "edgeCases", title: "Edge Cases", desc: "Corner cases to consider", icon: AlertTriangle },
+        { key: "whenToUse", title: "When To Use", desc: "Applicable scenarios", icon: Key }
+    ];
+
     return (
-        <div className="snippet-detail">
-            {/* Header */}
-            <div className="snippet-header">
-                <h3>{snippet.title}</h3>
-                <span className="snippet-meta">
-                    {snippet.topic}
-                    {snippet.createdAtReadable && (
-                        <span> • {snippet.createdAtReadable.split(" ")[1]}</span>
-                    )}
-                </span>
-
-                {/* AI Tags with badge */}
-                {snippet.aiTags && snippet.aiTags.length > 0 && (
-                    <div className="snippet-tags detail-tags">
-                        {snippet.aiTags.map((tag, index) => (
-                            <span key={`ai-${index}`} className="ai-tag-chip">
-                                <span className="ai-badge">AI</span>
-                                {tag}
-                            </span>
-                        ))}
+        <div className="snippet-detail-tabbed">
+            {/* Top section - Code panel */}
+            <section className="detail-code-section">
+                <div className="code-panel-header">
+                    <div className="code-title-row">
+                        <FileCode size={18} className="code-title-icon" />
+                        <h2 className="code-title">{snippet.title || "Untitled"}</h2>
                     </div>
-                )}
-
-                {/* User tags (if different from AI tags) */}
-                {snippet.tags && snippet.tags.length > 0 && (
-                    <div className="snippet-tags detail-tags user-tags">
-                        {snippet.tags
-                            .filter(tag => !snippet.aiTags?.includes(tag))
-                            .map((tag, index) => (
-                                <span key={`user-${index}`} className="tag-chip">
-                                    {tag}
-                                </span>
-                            ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Code block */}
-            <div className="code-container">
-                <button
-                    className="btn-copy"
-                    onClick={handleCopyCode}
-                    title="Copy code"
-                >
-                    {copied ? "Copied!" : "Copy"}
-                </button>
-                <pre className="snippet-code">
+                    <button
+                        className="btn-copy"
+                        onClick={handleCopyCode}
+                        title="Copy code"
+                    >
+                        {copied ? <Check size={16} /> : <Copy size={16} />}
+                        <span>{copied ? "Copied" : "Copy"}</span>
+                    </button>
+                </div>
+                <pre className="code-display">
                     <code>{snippet.code}</code>
                 </pre>
-            </div>
+            </section>
 
-            {/* AI Notes Section */}
-            <div className="ai-section">
-                <h4 className="ai-section-title">🤖 AI Notes</h4>
+            {/* Bottom section - Tabs */}
+            <section className="detail-tabs-section">
+                {/* Tab headers */}
+                <div className="tabs-header" role="tablist">
+                    <button
+                        className={`tab-btn ${activeTab === "details" ? "active" : ""}`}
+                        onClick={() => setActiveTab("details")}
+                        role="tab"
+                        aria-selected={activeTab === "details"}
+                    >
+                        <Info size={16} />
+                        <span>Details</span>
+                    </button>
+                    <button
+                        className={`tab-btn ${activeTab === "notes" ? "active" : ""}`}
+                        onClick={() => setActiveTab("notes")}
+                        role="tab"
+                        aria-selected={activeTab === "notes"}
+                    >
+                        <BookOpen size={16} />
+                        <span>AI Notes</span>
+                        {generatingNotes && <span className="tab-badge">...</span>}
+                    </button>
+                </div>
 
-                {/* Loading state */}
-                {generatingNotes && (
-                    <div className="ai-loading">
-                        <span className="ai-spinner"></span>
-                        <span>Generating AI notes...</span>
-                    </div>
-                )}
+                {/* Tab content */}
+                <div className="tab-content" role="tabpanel">
+                    {/* Details Tab */}
+                    {activeTab === "details" && (
+                        <div className="details-tab">
+                            {/* Topic */}
+                            <div className="detail-field">
+                                <label className="field-label">Topic</label>
+                                <div className="field-value topic-badge">
+                                    {snippet.topic || "No topic"}
+                                </div>
+                            </div>
 
-                {/* Failed state */}
-                {!generatingNotes && snippet.aiStatus === "failed" && (
-                    <div className="ai-failed">
-                        <span>⚠️ AI notes generation failed</span>
-                        {onRetryNotes && (
-                            <button
-                                className="btn-retry"
-                                onClick={() => onRetryNotes(snippet)}
-                            >
-                                🔄 Retry
-                            </button>
-                        )}
-                    </div>
-                )}
+                            {/* Date */}
+                            <div className="detail-field">
+                                <label className="field-label">Created</label>
+                                <div className="field-value">
+                                    <Calendar size={14} />
+                                    <span>{snippet.createdAtReadable || "Unknown"}</span>
+                                </div>
+                            </div>
 
-                {/* Success - Collapsible sections */}
-                {!generatingNotes && snippet.aiNotes && typeof snippet.aiNotes === "object" && (
-                    <div className="ai-notes-structured">
-                        {snippet.aiNotes.problem && (
-                            <CollapsibleSection title="Problem" icon="🎯" defaultOpen={true}>
-                                <p>{snippet.aiNotes.problem}</p>
-                            </CollapsibleSection>
-                        )}
+                            {/* AI Tags */}
+                            {snippet.aiTags && snippet.aiTags.length > 0 && (
+                                <div className="detail-field">
+                                    <label className="field-label">
+                                        <Sparkles size={12} />
+                                        AI Tags
+                                    </label>
+                                    <div className="tags-display">
+                                        {snippet.aiTags.map((tag, i) => (
+                                            <span key={i} className="tag-ai">{tag}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
-                        {snippet.aiNotes.intuition && (
-                            <CollapsibleSection title="Intuition" icon="💡" defaultOpen={true}>
-                                <p>{snippet.aiNotes.intuition}</p>
-                            </CollapsibleSection>
-                        )}
+                            {/* User Tags */}
+                            {snippet.tags && snippet.tags.length > 0 && (
+                                <div className="detail-field">
+                                    <label className="field-label">
+                                        <Tag size={12} />
+                                        Tags
+                                    </label>
+                                    <div className="tags-display">
+                                        {snippet.tags
+                                            .filter(t => !snippet.aiTags?.includes(t))
+                                            .map((tag, i) => (
+                                                <span key={i} className="tag-user">{tag}</span>
+                                            ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
-                        {snippet.aiNotes.approach && (
-                            <CollapsibleSection title="Approach" icon="🛠️">
-                                <p>{snippet.aiNotes.approach}</p>
-                            </CollapsibleSection>
-                        )}
+                    {/* AI Notes Tab */}
+                    {activeTab === "notes" && (
+                        <div className="notes-tab">
+                            {/* Loading state */}
+                            {generatingNotes && (
+                                <div className="notes-loading">
+                                    <div className="loading-spinner-small"></div>
+                                    <span>Generating AI notes...</span>
+                                </div>
+                            )}
 
-                        {snippet.aiNotes.algorithmSteps && (
-                            <CollapsibleSection title="Algorithm Steps" icon="📋">
-                                <p>{snippet.aiNotes.algorithmSteps}</p>
-                            </CollapsibleSection>
-                        )}
+                            {/* Failed state */}
+                            {!generatingNotes && snippet.aiStatus === "failed" && (
+                                <div className="notes-failed">
+                                    <AlertTriangle size={20} />
+                                    <div className="notes-failed-text">
+                                        <span>AI notes generation failed</span>
+                                        <p>There was an error generating notes for this snippet.</p>
+                                    </div>
+                                    {onRetryNotes && (
+                                        <button
+                                            className="btn-retry"
+                                            onClick={() => onRetryNotes(snippet)}
+                                        >
+                                            <RefreshCw size={14} />
+                                            Retry
+                                        </button>
+                                    )}
+                                </div>
+                            )}
 
-                        {snippet.aiNotes.timeComplexity && (
-                            <CollapsibleSection title="Time Complexity" icon="⏱️">
-                                <p>{snippet.aiNotes.timeComplexity}</p>
-                            </CollapsibleSection>
-                        )}
+                            {/* Success - Accordion sections */}
+                            {!generatingNotes && snippet.aiNotes && typeof snippet.aiNotes === "object" && (
+                                <div className="notes-accordion-list">
+                                    {noteSections.map((section) => {
+                                        const content = snippet.aiNotes[section.key];
+                                        if (!content) return null;
 
-                        {snippet.aiNotes.spaceComplexity && (
-                            <CollapsibleSection title="Space Complexity" icon="💾">
-                                <p>{snippet.aiNotes.spaceComplexity}</p>
-                            </CollapsibleSection>
-                        )}
+                                        return (
+                                            <AccordionSection
+                                                key={section.key}
+                                                title={section.title}
+                                                description={section.desc}
+                                                icon={section.icon}
+                                                defaultOpen={section.open}
+                                            >
+                                                <p>{content}</p>
+                                            </AccordionSection>
+                                        );
+                                    })}
+                                </div>
+                            )}
 
-                        {snippet.aiNotes.edgeCases && (
-                            <CollapsibleSection title="Edge Cases" icon="⚠️">
-                                <p>{snippet.aiNotes.edgeCases}</p>
-                            </CollapsibleSection>
-                        )}
+                            {/* No notes yet */}
+                            {!generatingNotes && !snippet.aiStatus && !snippet.aiNotes && (
+                                <div className="notes-pending">
+                                    <Sparkles size={24} className="pending-icon" />
+                                    <span>AI notes not generated yet</span>
+                                    {onRetryNotes && (
+                                        <button
+                                            className="btn-generate"
+                                            onClick={() => onRetryNotes(snippet)}
+                                        >
+                                            <Sparkles size={14} />
+                                            Generate Notes
+                                        </button>
+                                    )}
+                                </div>
+                            )}
 
-                        {snippet.aiNotes.whenToUse && (
-                            <CollapsibleSection title="When To Use" icon="🔑">
-                                <p>{snippet.aiNotes.whenToUse}</p>
-                            </CollapsibleSection>
-                        )}
-                    </div>
-                )}
-
-                {/* No notes yet */}
-                {!generatingNotes && !snippet.aiStatus && !snippet.aiNotes && (
-                    <div className="ai-pending">
-                        <span>AI notes not generated yet.</span>
-                        {onRetryNotes && (
-                            <button
-                                className="btn-retry"
-                                onClick={() => onRetryNotes(snippet)}
-                            >
-                                ✨ Generate Notes
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Fallback for string notes */}
-                {!generatingNotes && snippet.aiNotes && typeof snippet.aiNotes === "string" && (
-                    <div className="ai-notes">
-                        <p className="ai-notes-text">{snippet.aiNotes}</p>
-                    </div>
-                )}
-            </div>
+                            {/* Fallback for string notes */}
+                            {!generatingNotes && snippet.aiNotes && typeof snippet.aiNotes === "string" && (
+                                <div className="notes-text">
+                                    <p>{snippet.aiNotes}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </section>
         </div>
     );
 }

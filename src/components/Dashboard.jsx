@@ -1,16 +1,18 @@
 // ==========================================
-// DASHBOARD COMPONENT (Day 3 - Review Flow)
+// DASHBOARD COMPONENT (Day 4 - Dark Dashboard)
 // ==========================================
-// Handles snippet management with:
-//   - Review-before-save flow (form handles metadata)
-//   - Background notes generation
-//   - Per-snippet loading states
+// Main dashboard with:
+//   - Sidebar navigation
+//   - TopBar with search
+//   - 3-pane layout: list | detail | form
 // ==========================================
 
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getSnippets, saveSnippet, updateSnippetAI } from "../utils/storage";
 import { generateSnippetNotes } from "../utils/groq";
+import Sidebar from "./Sidebar";
+import TopBar from "./TopBar";
 import SnippetForm from "./SnippetForm";
 import SnippetList from "./SnippetList";
 import SnippetDetail from "./SnippetDetail";
@@ -32,6 +34,10 @@ function Dashboard() {
     // Search and filter
     const [searchTerm, setSearchTerm] = useState("");
     const [filterDate, setFilterDate] = useState("");
+
+    // Sidebar state
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [activeSection, setActiveSection] = useState("dashboard");
 
     // Load snippets on mount
     useEffect(() => {
@@ -65,8 +71,8 @@ function Dashboard() {
                 code: snippetData.code,
                 title: snippetData.title,
                 topic: snippetData.topic,
-                tags: snippetData.tags,      // User-edited tags
-                aiTags: snippetData.tags     // Store same as aiTags for now
+                tags: snippetData.tags,
+                aiTags: snippetData.tags
             });
 
             console.log("[DASHBOARD] Snippet saved:", savedSnippet.id);
@@ -91,7 +97,6 @@ function Dashboard() {
 
         try {
             console.log("[DASHBOARD] Generating notes...");
-            // Pass title and topic so AI notes match user's final edits
             const notesData = await generateSnippetNotes(
                 snippetData.code,
                 snippetData.title,
@@ -154,7 +159,6 @@ function Dashboard() {
         setGeneratingNotesById(prev => ({ ...prev, [snippet.id]: true }));
 
         try {
-            // Pass title and topic so AI notes match user's saved metadata
             const notesData = await generateSnippetNotes(
                 snippet.code,
                 snippet.title,
@@ -224,72 +228,68 @@ function Dashboard() {
         return generatingNotesById[snippetId] === true;
     }
 
+    // Toggle sidebar
+    function toggleSidebar() {
+        setSidebarOpen(!sidebarOpen);
+    }
+
     return (
-        <div className="dashboard">
-            <header className="dashboard-header">
-                <h1>Code Recall</h1>
-                <div className="header-right">
-                    <span className="user-email">{user.email}</span>
-                    <button onClick={logout} className="btn-secondary">Logout</button>
-                </div>
-            </header>
+        <div className="app-layout">
+            {/* Sidebar */}
+            <Sidebar
+                activeSection={activeSection}
+                onSectionChange={setActiveSection}
+                isOpen={sidebarOpen}
+                onToggle={toggleSidebar}
+            />
 
-            <div className="search-filter-bar">
-                <div className="search-input-wrapper">
-                    <input
-                        type="text"
-                        placeholder="Search snippets..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="search-input"
-                    />
-                </div>
-                <div className="date-filter-wrapper">
-                    <label htmlFor="dateFilter">Filter by date:</label>
-                    <input
-                        type="date"
-                        id="dateFilter"
-                        value={filterDate}
-                        onChange={(e) => setFilterDate(e.target.value)}
-                        className="date-input"
-                    />
-                    {filterDate && (
-                        <button
-                            onClick={() => setFilterDate("")}
-                            className="btn-clear"
-                            title="Clear date filter"
-                        >
-                            ✕
-                        </button>
-                    )}
-                </div>
+            {/* Main content area */}
+            <div className="main-content">
+                {/* Top bar */}
+                <TopBar
+                    user={user}
+                    onLogout={logout}
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    filterDate={filterDate}
+                    onFilterDateChange={setFilterDate}
+                    onMenuToggle={toggleSidebar}
+                />
+
+                {/* Dashboard content - 3 pane layout */}
+                <main className="dashboard-content">
+                    {/* Left pane - Snippet list */}
+                    <section className="pane pane-list">
+                        <div className="pane-header">
+                            <h2>Snippets</h2>
+                            <span className="snippet-count">{filteredSnippets.length}</span>
+                        </div>
+                        {filterDate && (
+                            <p className="filter-hint-dark">Filtering: {filterDate}</p>
+                        )}
+                        <SnippetList
+                            snippets={filteredSnippets}
+                            selectedId={selectedSnippet?.id}
+                            onSelect={handleSelectSnippet}
+                            loading={loading}
+                        />
+                    </section>
+
+                    {/* Center pane - Snippet detail */}
+                    <section className="pane pane-detail">
+                        <SnippetDetail
+                            snippet={selectedSnippet}
+                            generatingNotes={selectedSnippet ? isGeneratingNotes(selectedSnippet.id) : false}
+                            onRetryNotes={handleRetryNotes}
+                        />
+                    </section>
+
+                    {/* Right pane - Snippet form */}
+                    <section className="pane pane-form">
+                        <SnippetForm onSave={handleSaveSnippet} saving={saving} />
+                    </section>
+                </main>
             </div>
-
-            <main className="dashboard-main">
-                <section className="dashboard-form">
-                    <SnippetForm onSave={handleSaveSnippet} saving={saving} />
-                </section>
-
-                <section className="dashboard-list">
-                    {filterDate && (
-                        <p className="filter-hint">Showing snippets from: {filterDate}</p>
-                    )}
-                    <SnippetList
-                        snippets={filteredSnippets}
-                        selectedId={selectedSnippet?.id}
-                        onSelect={handleSelectSnippet}
-                        loading={loading}
-                    />
-                </section>
-
-                <section className="dashboard-detail">
-                    <SnippetDetail
-                        snippet={selectedSnippet}
-                        generatingNotes={selectedSnippet ? isGeneratingNotes(selectedSnippet.id) : false}
-                        onRetryNotes={handleRetryNotes}
-                    />
-                </section>
-            </main>
         </div>
     );
 }
