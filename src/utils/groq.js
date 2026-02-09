@@ -123,9 +123,11 @@ ${code}`;
  * Generate structured AI notes - BACKGROUND CALL
  * Called after snippet is saved. Does not block UI.
  * @param {string} code - The code snippet to analyze
+ * @param {string} title - User-edited title (optional, provides context)
+ * @param {string} topic - User-edited topic (optional, provides context)
  * @returns {Promise<Object>} - { aiNotes: {...} }
  */
-export async function generateSnippetNotes(code) {
+export async function generateSnippetNotes(code, title = "", topic = "") {
     const apiKey = import.meta.env.VITE_GROQ_API_KEY;
 
     if (!apiKey) {
@@ -140,9 +142,18 @@ export async function generateSnippetNotes(code) {
 Return only valid JSON strictly in the given schema.
 Do not add any text outside JSON.`;
 
+    // Build context from user-edited metadata
+    let contextInfo = "";
+    if (title || topic) {
+        contextInfo = `\nContext provided by user:`;
+        if (title) contextInfo += `\n- Title: ${title}`;
+        if (topic) contextInfo += `\n- Topic: ${topic}`;
+        contextInfo += `\n\nUse this context to ensure your notes are aligned with what the user intends this snippet to be about.\n`;
+    }
+
     // User prompt for structured notes
     const userPrompt = `Generate structured learning notes for the following code.
-
+${contextInfo}
 Target audience: DSA / competitive programming student
 Be beginner-friendly but technically correct.
 Assume the student may revisit this months later.

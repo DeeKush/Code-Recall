@@ -91,7 +91,12 @@ function Dashboard() {
 
         try {
             console.log("[DASHBOARD] Generating notes...");
-            const notesData = await generateSnippetNotes(snippetData.code);
+            // Pass title and topic so AI notes match user's final edits
+            const notesData = await generateSnippetNotes(
+                snippetData.code,
+                snippetData.title,
+                snippetData.topic
+            );
 
             await updateSnippetAI(user.uid, savedSnippet.id, notesData, "success");
 
@@ -149,7 +154,12 @@ function Dashboard() {
         setGeneratingNotesById(prev => ({ ...prev, [snippet.id]: true }));
 
         try {
-            const notesData = await generateSnippetNotes(snippet.code);
+            // Pass title and topic so AI notes match user's saved metadata
+            const notesData = await generateSnippetNotes(
+                snippet.code,
+                snippet.title,
+                snippet.topic
+            );
             await updateSnippetAI(user.uid, snippet.id, notesData, "success");
 
             const updatedSnippet = {
