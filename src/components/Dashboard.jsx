@@ -28,8 +28,10 @@ function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    // Per-snippet notes generation tracking
-    const [generatingNotesById, setGeneratingNotesById] = useState({});
+
+    // Per-snippet notes state (transient)
+    // { [snippetId]: "idle" | "generating" | "done" | "error" }
+    const [notesStatus, setNotesStatus] = useState({});
 
     // Search and filter
     const [searchTerm, setSearchTerm] = useState("");
@@ -93,7 +95,10 @@ function Dashboard() {
         // ----------------------------------------
         // Background: Generate notes
         // ----------------------------------------
-        setGeneratingNotesById(prev => ({ ...prev, [savedSnippet.id]: true }));
+        // ----------------------------------------
+        // Background: Generate notes
+        // ----------------------------------------
+        setNotesStatus(prev => ({ ...prev, [savedSnippet.id]: "generating" }));
 
         try {
             console.log("[DASHBOARD] Generating notes...");
@@ -119,6 +124,7 @@ function Dashboard() {
                 prev?.id === savedSnippet.id ? updatedSnippet : prev
             );
 
+            setNotesStatus(prev => ({ ...prev, [savedSnippet.id]: "done" }));
             console.log("[DASHBOARD] Notes saved!");
 
         } catch (error) {
@@ -138,12 +144,8 @@ function Dashboard() {
                 console.error("[DASHBOARD] Status update failed:", updateError);
             }
 
-        } finally {
-            setGeneratingNotesById(prev => {
-                const newState = { ...prev };
-                delete newState[savedSnippet.id];
-                return newState;
-            });
+            setNotesStatus(prev => ({ ...prev, [savedSnippet.id]: "error" }));
+
         }
     }
 
@@ -154,9 +156,9 @@ function Dashboard() {
 
     // Retry notes generation
     async function handleRetryNotes(snippet) {
-        if (generatingNotesById[snippet.id]) return;
+        if (notesStatus[snippet.id] === "generating") return;
 
-        setGeneratingNotesById(prev => ({ ...prev, [snippet.id]: true }));
+        setNotesStatus(prev => ({ ...prev, [snippet.id]: "generating" }));
 
         try {
             const notesData = await generateSnippetNotes(
@@ -177,20 +179,25 @@ function Dashboard() {
             ));
             setSelectedSnippet(updatedSnippet);
 
+            setNotesStatus(prev => ({ ...prev, [snippet.id]: "done" }));
+
         } catch (error) {
             console.error("[DASHBOARD] Retry failed:", error.message);
             try {
                 await updateSnippetAI(user.uid, snippet.id, null, "failed");
+
+                // Update local state to reflect failure
+                const failedSnippet = { ...snippet, aiStatus: "failed" };
+                setSnippets(prev => prev.map(s =>
+                    s.id === snippet.id ? failedSnippet : s
+                ));
+                setSelectedSnippet(failedSnippet);
+
             } catch (updateError) {
                 console.error("[DASHBOARD] Status update failed:", updateError);
             }
 
-        } finally {
-            setGeneratingNotesById(prev => {
-                const newState = { ...prev };
-                delete newState[snippet.id];
-                return newState;
-            });
+            setNotesStatus(prev => ({ ...prev, [snippet.id]: "error" }));
         }
     }
 
@@ -223,10 +230,7 @@ function Dashboard() {
         return true;
     });
 
-    // Check if generating notes for a snippet
-    function isGeneratingNotes(snippetId) {
-        return generatingNotesById[snippetId] === true;
-    }
+
 
     // Toggle sidebar
     function toggleSidebar() {
@@ -279,7 +283,7 @@ function Dashboard() {
                     <section className="pane pane-detail">
                         <SnippetDetail
                             snippet={selectedSnippet}
-                            generatingNotes={selectedSnippet ? isGeneratingNotes(selectedSnippet.id) : false}
+                            notesStatus={selectedSnippet ? (notesStatus[selectedSnippet.id] || "idle") : "idle"}
                             onRetryNotes={handleRetryNotes}
                         />
                     </section>

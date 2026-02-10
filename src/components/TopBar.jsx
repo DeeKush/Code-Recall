@@ -7,6 +7,7 @@
 //   - User info and logout
 // ==========================================
 
+import { useState, useEffect } from "react";
 import { Search, LogOut, Calendar, X } from "lucide-react";
 import { MobileMenuButton } from "./Sidebar";
 
@@ -19,6 +20,25 @@ function TopBar({
     onFilterDateChange,
     onMenuToggle
 }) {
+    // Local state for debounced search
+    const [localSearch, setLocalSearch] = useState(searchTerm);
+
+    // Sync local state when prop changes (e.g. clear button)
+    useEffect(() => {
+        setLocalSearch(searchTerm);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            // Only call parent if value changed
+            if (localSearch !== searchTerm) {
+                onSearchChange(localSearch);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [localSearch, searchTerm, onSearchChange]);
+
     return (
         <header className="topbar">
             {/* Left section - Mobile menu + Search */}
@@ -30,8 +50,8 @@ function TopBar({
                     <input
                         type="text"
                         placeholder="Search snippets..."
-                        value={searchTerm}
-                        onChange={(e) => onSearchChange(e.target.value)}
+                        value={localSearch}
+                        onChange={(e) => setLocalSearch(e.target.value)}
                         className="search-input-dark"
                     />
                 </div>

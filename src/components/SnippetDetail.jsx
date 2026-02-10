@@ -61,7 +61,7 @@ function AccordionSection({ title, description, icon: Icon, children, defaultOpe
     );
 }
 
-function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
+function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState("details");
 
@@ -98,6 +98,10 @@ function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
         { key: "edgeCases", title: "Edge Cases", desc: "Corner cases to consider", icon: AlertTriangle },
         { key: "whenToUse", title: "When To Use", desc: "Applicable scenarios", icon: Key }
     ];
+
+    const isGenerating = notesStatus === "generating";
+    const isError = notesStatus === "error" || snippet.aiStatus === "failed";
+    const hasNotes = notesStatus === "done" || (snippet.aiNotes && !isGenerating && !isError);
 
     return (
         <div className="snippet-detail-tabbed">
@@ -143,7 +147,7 @@ function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
                     >
                         <BookOpen size={16} />
                         <span>AI Notes</span>
-                        {generatingNotes && <span className="tab-badge">...</span>}
+                        {isGenerating && <span className="tab-badge">...</span>}
                     </button>
                 </div>
 
@@ -207,7 +211,7 @@ function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
                     {activeTab === "notes" && (
                         <div className="notes-tab">
                             {/* Loading state */}
-                            {generatingNotes && (
+                            {isGenerating && (
                                 <div className="notes-loading">
                                     <div className="loading-spinner-small"></div>
                                     <span>Generating AI notes...</span>
@@ -215,11 +219,11 @@ function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
                             )}
 
                             {/* Failed state */}
-                            {!generatingNotes && snippet.aiStatus === "failed" && (
+                            {!isGenerating && isError && (
                                 <div className="notes-failed">
                                     <AlertTriangle size={20} />
                                     <div className="notes-failed-text">
-                                        <span>AI notes generation failed</span>
+                                        <span>AI notes failed to generate.</span>
                                         <p>There was an error generating notes for this snippet.</p>
                                     </div>
                                     {onRetryNotes && (
@@ -228,14 +232,14 @@ function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
                                             onClick={() => onRetryNotes(snippet)}
                                         >
                                             <RefreshCw size={14} />
-                                            Retry
+                                            Retry AI notes
                                         </button>
                                     )}
                                 </div>
                             )}
 
                             {/* Success - Accordion sections */}
-                            {!generatingNotes && snippet.aiNotes && typeof snippet.aiNotes === "object" && (
+                            {!isGenerating && !isError && snippet.aiNotes && typeof snippet.aiNotes === "object" && (
                                 <div className="notes-accordion-list">
                                     {noteSections.map((section) => {
                                         const content = snippet.aiNotes[section.key];
@@ -257,7 +261,7 @@ function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
                             )}
 
                             {/* No notes yet */}
-                            {!generatingNotes && !snippet.aiStatus && !snippet.aiNotes && (
+                            {!isGenerating && !isError && !snippet.aiNotes && (
                                 <div className="notes-pending">
                                     <Sparkles size={24} className="pending-icon" />
                                     <span>AI notes not generated yet</span>
@@ -267,14 +271,14 @@ function SnippetDetail({ snippet, generatingNotes, onRetryNotes }) {
                                             onClick={() => onRetryNotes(snippet)}
                                         >
                                             <Sparkles size={14} />
-                                            Generate Notes
+                                            Generate AI notes
                                         </button>
                                     )}
                                 </div>
                             )}
 
                             {/* Fallback for string notes */}
-                            {!generatingNotes && snippet.aiNotes && typeof snippet.aiNotes === "string" && (
+                            {!isGenerating && !isError && snippet.aiNotes && typeof snippet.aiNotes === "string" && (
                                 <div className="notes-text">
                                     <p>{snippet.aiNotes}</p>
                                 </div>

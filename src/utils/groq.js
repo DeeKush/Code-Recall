@@ -1,251 +1,141 @@
 // ==========================================
-// GROQ API UTILITY (Day 3 - Two-Step Version)
+// GROQ AI CLIENT (Day 5 - Reliability Update)
 // ==========================================
-// Two separate functions for fast metadata and background notes.
-// Uses Groq's fast LLM inference with Llama models.
+// Handles interactions with Groq API for:
+//   1. Generating snippet metadata (title, topic, tags)
+//   2. Generating detailed notes (explanation, complexity, etc.)
+//
+// Updates:
+//   - 15s Timeout on all calls
+//   - 1 Retry logic for transient failures
+//   - Clean error handling (no silent failures)
 // ==========================================
 
+const API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+const API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "llama3-70b-8192";
+
 /**
- * Generate snippet metadata (title, topic, aiTags) - FAST CALL
- * This is called first and blocks until done.
- * @param {string} code - The code snippet to analyze
- * @returns {Promise<Object>} - { title, topic, aiTags }
+ * Helper: Timeout Promise
+ * Rejects if the operation takes longer than ms
+ */
+function timeout(ms) {
+    return new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms);
+    });
+}
+
+/**
+ * Helper: Retry Logic
+ * Retries the async operation once if it fails
+ */
+async function withRetry(fn, retries = 1) {
+    try {
+        return await fn();
+    } catch (error) {
+        if (retries > 0) {
+            console.warn(`[Groq] Call failed, retrying... (${retries} left). Error: ${error.message}`);
+            return await withRetry(fn, retries - 1);
+        }
+        throw error;
+    }
+}
+
+/**
+ * Helper: Make Groq API Call
+ * Wraps fetch with timeout and standard headers
+ */
+async function callGroq(messages) {
+    // 15 seconds strict timeout
+    const TIMEOUT_MS = 15000;
+
+    const fetchPromise = fetch(API_URL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${API_KEY}`
+        },
+        body: JSON.stringify({
+            model: MODEL,
+            messages: messages,
+            temperature: 0.5,
+            response_format: { type: "json_object" }
+        })
+    });
+
+    const response = await Promise.race([
+        fetchPromise,
+        timeout(TIMEOUT_MS)
+    ]);
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Groq API Error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+
+    if (!content) {
+        throw new Error("Groq returned empty response");
+    }
+
+    return JSON.parse(content);
+}
+
+/**
+ * 1. Generate Snippet Metadata (Step 1 of Flow)
+ * Returns: { title, topic, aiTags: [] }
  */
 export async function generateSnippetMetadata(code) {
-    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+    if (!API_KEY) throw new Error("Missing VITE_GROQ_API_KEY");
 
-    if (!apiKey) {
-        console.error("[GROQ] No API key found. Set VITE_GROQ_API_KEY in .env file.");
-        throw new Error("Groq API key not configured");
-    }
+    const prompt = `
+    Analyze this code snippet.
+    Return a strictly valid JSON object (no markdown, no extra text) with:
+    - title: A short, descriptive title (max 6 words)
+    - topic: The main programming concept or algorithm (e.g., "Binary Search", "React Hooks")
+    - aiTags: Array of 3-5 relevant keywords/tags
 
-    const url = "https://api.groq.com/openai/v1/chat/completions";
+    Code:
+    ${code.slice(0, 2000)}
+    `;
 
-    // System prompt for metadata generation
-    const systemPrompt = `You are an expert competitive programming tutor.
-Return only valid JSON strictly in the given schema.
-Do not add any text outside JSON.`;
-
-    // User prompt for metadata
-    const userPrompt = `Analyze the following code and generate:
-
-- a short clear title (max 8 words)
-- the main topic (e.g. "Binary Search", "Dynamic Programming", "Graph Traversal")
-- useful short skill-based tags (4-6 tags)
-
-Return ONLY this JSON format:
-{
-  "title": "string",
-  "topic": "string",
-  "aiTags": ["string"]
-}
-
-Code:
-${code}`;
-
-    // 15 second timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-    try {
-        console.log("[GROQ] Generating metadata...");
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
-                ],
-                temperature: 0.3,
-                max_tokens: 200
-            }),
-            signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[GROQ] Metadata API error:", response.status, errorText);
-            throw new Error(`Groq API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const textContent = data.choices?.[0]?.message?.content;
-
-        if (!textContent) {
-            throw new Error("Empty response from Groq");
-        }
-
-        // Clean markdown wrappers if present
-        const cleanedText = textContent
-            .replace(/```json\n?/g, "")
-            .replace(/```\n?/g, "")
-            .trim();
-
-        console.log("[GROQ] Metadata raw:", cleanedText);
-
-        const metadata = JSON.parse(cleanedText);
-
-        // Validate structure
-        if (!metadata.title || !metadata.topic || !Array.isArray(metadata.aiTags)) {
-            throw new Error("Invalid metadata structure");
-        }
-
-        console.log("[GROQ] Metadata parsed:", metadata);
-
-        return {
-            title: metadata.title,
-            topic: metadata.topic,
-            aiTags: metadata.aiTags
-        };
-
-    } catch (error) {
-        clearTimeout(timeoutId);
-
-        if (error.name === "AbortError") {
-            console.error("[GROQ] Metadata request timed out");
-            throw new Error("Metadata generation timed out");
-        }
-
-        console.error("[GROQ] Metadata error:", error.message);
-        throw error;
-    }
+    return withRetry(async () => {
+        return await callGroq([
+            { role: "system", content: "You are a helpful coding assistant. You strictly output JSON." },
+            { role: "user", content: prompt }
+        ]);
+    }, 1);
 }
 
 /**
- * Generate structured AI notes - BACKGROUND CALL
- * Called after snippet is saved. Does not block UI.
- * @param {string} code - The code snippet to analyze
- * @param {string} title - User-edited title (optional, provides context)
- * @param {string} topic - User-edited topic (optional, provides context)
- * @returns {Promise<Object>} - { aiNotes: {...} }
+ * 2. Generate Snippet Notes (Step 2 of Flow / Background)
+ * Returns: { aiNotes: { ... } }
  */
 export async function generateSnippetNotes(code, title = "", topic = "") {
-    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+    if (!API_KEY) throw new Error("Missing VITE_GROQ_API_KEY");
 
-    if (!apiKey) {
-        console.error("[GROQ] No API key found.");
-        throw new Error("Groq API key not configured");
-    }
+    const prompt = `
+    Explain this code snippet titled "${title}" (Topic: ${topic}).
+    Return a strictly valid JSON object (no markdown) with a key "aiNotes" containing an object with these exact keys:
+    - problem: What problem does this solve?
+    - intuition: The core idea/insight.
+    - approach: High-level strategy.
+    - algorithmSteps: Step-by-step logic.
+    - timeComplexity: Big O analysis.
+    - spaceComplexity: Memory usage analysis.
+    - edgeCases: What to watch out for.
+    - whenToUse: Best scenarios for this pattern.
 
-    const url = "https://api.groq.com/openai/v1/chat/completions";
+    Code:
+    ${code.slice(0, 2000)}
+    `;
 
-    // System prompt for notes generation
-    const systemPrompt = `You are an expert competitive programming and DSA tutor.
-Return only valid JSON strictly in the given schema.
-Do not add any text outside JSON.`;
-
-    // Build context from user-edited metadata
-    let contextInfo = "";
-    if (title || topic) {
-        contextInfo = `\nContext provided by user:`;
-        if (title) contextInfo += `\n- Title: ${title}`;
-        if (topic) contextInfo += `\n- Topic: ${topic}`;
-        contextInfo += `\n\nUse this context to ensure your notes are aligned with what the user intends this snippet to be about.\n`;
-    }
-
-    // User prompt for structured notes
-    const userPrompt = `Generate structured learning notes for the following code.
-${contextInfo}
-Target audience: DSA / competitive programming student
-Be beginner-friendly but technically correct.
-Assume the student may revisit this months later.
-Keep explanations concise but complete.
-
-Return ONLY this JSON format:
-{
-  "aiNotes": {
-    "problem": "string - one clear sentence describing what the problem is solving",
-    "intuition": "string - the core idea behind the solution",
-    "approach": "string - high-level strategy without implementation details",
-    "algorithmSteps": "string - step-by-step logical flow (can use numbered steps)",
-    "timeComplexity": "string - Big-O with short explanation",
-    "spaceComplexity": "string - Big-O with short explanation",
-    "edgeCases": "string - important corner cases to remember",
-    "whenToUse": "string - when this pattern is applicable"
-  }
-}
-
-Code:
-${code}`;
-
-    // 15 second timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-    try {
-        console.log("[GROQ] Generating notes...");
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
-                ],
-                temperature: 0.3,
-                max_tokens: 800
-            }),
-            signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[GROQ] Notes API error:", response.status, errorText);
-            throw new Error(`Groq API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const textContent = data.choices?.[0]?.message?.content;
-
-        if (!textContent) {
-            throw new Error("Empty response from Groq");
-        }
-
-        // Clean markdown wrappers if present
-        const cleanedText = textContent
-            .replace(/```json\n?/g, "")
-            .replace(/```\n?/g, "")
-            .trim();
-
-        console.log("[GROQ] Notes raw:", cleanedText);
-
-        const notesData = JSON.parse(cleanedText);
-
-        // Validate structure
-        if (!notesData.aiNotes || typeof notesData.aiNotes !== "object") {
-            throw new Error("Invalid notes structure");
-        }
-
-        console.log("[GROQ] Notes parsed:", notesData);
-
-        return {
-            aiNotes: notesData.aiNotes
-        };
-
-    } catch (error) {
-        clearTimeout(timeoutId);
-
-        if (error.name === "AbortError") {
-            console.error("[GROQ] Notes request timed out");
-            throw new Error("Notes generation timed out");
-        }
-
-        console.error("[GROQ] Notes error:", error.message);
-        throw error;
-    }
+    return withRetry(async () => {
+        return await callGroq([
+            { role: "system", content: "You are an expert developer. You explain code clearly. You strictly output JSON." },
+            { role: "user", content: prompt }
+        ]);
+    }, 1);
 }

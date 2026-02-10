@@ -165,7 +165,9 @@ export async function updateSnippetAI(userId, snippetId, aiData, status) {
         const updateData = {
             aiNotes: aiData?.aiNotes || null,
             aiGeneratedAt: Timestamp.fromDate(new Date()),
-            aiStatus: status  // "success" or "failed"
+            aiStatus: status,  // "success" or "failed"
+            aiProvider: "groq",
+            aiModel: "llama3-70b-8192"
         };
 
         console.log("[DEBUG] Updating with AI data:", updateData);
