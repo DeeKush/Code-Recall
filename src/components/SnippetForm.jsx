@@ -49,7 +49,11 @@ function SnippetForm({ onSave, saving }) {
             setShowReview(true);
         } catch (error) {
             console.error("Analysis failed:", error);
-            alert("Failed to analyze code. Please try again.");
+            // Fallback: let user fill in details manually
+            setTitle("");
+            setTopic("");
+            setTagsInput("");
+            setShowReview(true);
         } finally {
             setAnalyzing(false);
         }

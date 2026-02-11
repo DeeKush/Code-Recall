@@ -2157,3 +2157,324 @@ textarea:focus-visible,
     font-size: 0.9rem;
   }
 }
+
+/* ==========================================
+   CODE VISUALIZER (Day 6)
+   ========================================== */
+
+/* --- Controls Bar --- */
+.visualize-tab {
+  padding: 0.5rem 0;
+}
+
+.viz-controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.viz-detected-lang {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.viz-detected-lang strong {
+  color: var(--accent-color);
+}
+
+.viz-dryrun-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background-color: rgba(0, 200, 150, 0.08);
+  border: 1px solid rgba(0, 200, 150, 0.25);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.viz-dryrun-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.viz-dryrun-values {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-run-viz {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--accent-color);
+  color: #000;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-run-viz:hover {
+  background-color: var(--accent-hover);
+}
+
+.btn-run-viz:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* --- Error State --- */
+.viz-error {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background-color: var(--error-bg);
+  color: var(--error-color);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+/* --- Step Bar --- */
+.viz-step-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.viz-step-counter {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-color);
+}
+
+.viz-step-buttons {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.btn-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-step:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.btn-step:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* --- Code Panel with Line Highlighting --- */
+.viz-code-panel {
+  background-color: var(--code-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+
+.viz-code-line {
+  display: flex;
+  padding: 0 1rem;
+  transition: background-color 0.15s ease;
+}
+
+.viz-line-active {
+  background-color: rgba(34, 197, 94, 0.15);
+  border-left: 3px solid var(--accent-color);
+}
+
+.viz-line-num {
+  width: 32px;
+  flex-shrink: 0;
+  text-align: right;
+  margin-right: 1rem;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.viz-line-text {
+  white-space: pre;
+  color: var(--code-text);
+}
+
+/* --- Execution State Panel --- */
+.viz-state-panel {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.viz-state-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.viz-state-section {
+  margin-bottom: 0.75rem;
+}
+
+.viz-state-section:last-child {
+  margin-bottom: 0;
+}
+
+.viz-state-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.viz-var-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.viz-var-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.8rem;
+}
+
+.viz-var-name {
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.viz-var-eq {
+  color: var(--text-muted);
+}
+
+.viz-var-value {
+  color: var(--text-primary);
+}
+
+/* --- Array Display --- */
+.viz-array-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.8rem;
+}
+
+.viz-array-cells {
+  display: flex;
+  gap: 2px;
+}
+
+.viz-array-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 0.4rem;
+  background-color: var(--ai-subtle);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+/* --- Empty State --- */
+.viz-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+  gap: 0.5rem;
+}
+
+.viz-empty-icon {
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.viz-empty p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.viz-empty-hint {
+  font-size: 0.8rem !important;
+  color: var(--text-muted);
+}
+
+/* Output window */
+.viz-output-panel {
+  background-color: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.82rem;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.viz-output-line {
+  color: #7ee787;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.viz-output-line::before {
+  content: "›  ";
+  color: rgba(255, 255, 255, 0.25);
+}

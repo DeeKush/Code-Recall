@@ -1,12 +1,13 @@
 // ==========================================
-// SNIPPET DETAIL COMPONENT (Day 4 - Tabbed Layout)
+// SNIPPET DETAIL COMPONENT (Day 4 + Day 6)
 // ==========================================
 // Split view with:
 //   - Top: Code editor panel
-//   - Bottom: Tabs (Details | AI Notes)
+//   - Bottom: Tabs (Details | AI Notes | Visualize)
 // ==========================================
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { visualizeSnippet } from "../utils/visualizer";
 import {
     Copy,
     Check,
@@ -26,7 +27,14 @@ import {
     Key,
     Calendar,
     Info,
-    BookOpen
+    BookOpen,
+    Play,
+    SkipBack,
+    SkipForward,
+    RotateCcw,
+    Monitor,
+    AlertCircle,
+    Terminal
 } from "lucide-react";
 
 // Collapsible accordion component with description
@@ -64,6 +72,53 @@ function AccordionSection({ title, description, icon: Icon, children, defaultOpe
 function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState("details");
+
+    // === Visualizer state ===
+    const [steps, setSteps] = useState([]);
+    const [currentStepIndex, setCurrentStepIndex] = useState(0);
+    const [vizError, setVizError] = useState("");
+    const [vizRunning, setVizRunning] = useState(false);
+    const [dryRunInputs, setDryRunInputs] = useState(null);
+    const [detectedLang, setDetectedLang] = useState("");
+
+    // Run visualization (unified)
+    const handleRunVisualization = useCallback(() => {
+        if (!snippet?.code) return;
+        setVizError("");
+        setVizRunning(true);
+        setDryRunInputs(null);
+        setDetectedLang("");
+        try {
+            const result = visualizeSnippet(snippet.code);
+            setDetectedLang(result.language || "");
+            if (result.dryRunInputs) {
+                setDryRunInputs(result.dryRunInputs);
+            }
+            if (result.error) {
+                setVizError(result.error === "__unsupported__"
+                    ? "Only Java and C++ are supported for visualization right now. More languages are coming soon."
+                    : "This snippet cannot be visualized yet.");
+                setSteps([]);
+            } else {
+                setSteps(result.steps);
+                setCurrentStepIndex(0);
+            }
+        } catch (err) {
+            console.error("[VISUALIZER]", err.message);
+            setVizError("This snippet cannot be visualized yet.");
+            setSteps([]);
+        } finally {
+            setVizRunning(false);
+        }
+    }, [snippet?.code]);
+
+    // Step controls
+    const handlePrevStep = () => setCurrentStepIndex(i => Math.max(0, i - 1));
+    const handleNextStep = () => setCurrentStepIndex(i => Math.min(steps.length - 1, i + 1));
+    const handleReset = () => setCurrentStepIndex(0);
+
+    // Current step data
+    const currentStep = steps[currentStepIndex] || null;
 
     function handleCopyCode() {
         if (snippet?.code) {
@@ -148,6 +203,15 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
                         <BookOpen size={16} />
                         <span>AI Notes</span>
                         {isGenerating && <span className="tab-badge">...</span>}
+                    </button>
+                    <button
+                        className={`tab-btn ${activeTab === "visualize" ? "active" : ""}`}
+                        onClick={() => setActiveTab("visualize")}
+                        role="tab"
+                        aria-selected={activeTab === "visualize"}
+                    >
+                        <Monitor size={16} />
+                        <span>Visualize</span>
                     </button>
                 </div>
 
@@ -281,6 +345,175 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
                             {!isGenerating && !isError && snippet.aiNotes && typeof snippet.aiNotes === "string" && (
                                 <div className="notes-text">
                                     <p>{snippet.aiNotes}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Visualize Tab */}
+                    {activeTab === "visualize" && (
+                        <div className="visualize-tab">
+                            {/* Controls bar: just run button (language auto-detected) */}
+                            <div className="viz-controls-bar">
+                                <button
+                                    className="btn-run-viz"
+                                    onClick={handleRunVisualization}
+                                    disabled={vizRunning}
+                                >
+                                    <Play size={14} />
+                                    {vizRunning ? "Running..." : "Run Visualization"}
+                                </button>
+                                {detectedLang && (
+                                    <span className="viz-detected-lang">
+                                        Detected: <strong>{detectedLang === "java" ? "Java" : "C++"}</strong>
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Dry-run inputs panel */}
+                            {dryRunInputs && Object.keys(dryRunInputs).length > 0 && (
+                                <div className="viz-dryrun-panel">
+                                    <span className="viz-dryrun-label">Dry-run inputs:</span>
+                                    <div className="viz-dryrun-values">
+                                        {Object.entries(dryRunInputs).map(([name, display]) => (
+                                            <span key={name} className="viz-var-chip">
+                                                <span className="viz-var-name">{name}</span>
+                                                <span className="viz-var-eq">=</span>
+                                                <span className="viz-var-value">{display}</span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Error state */}
+                            {vizError && (
+                                <div className="viz-error">
+                                    <AlertCircle size={18} />
+                                    <span>{vizError}</span>
+                                </div>
+                            )}
+
+                            {/* Visualization results */}
+                            {steps.length > 0 && !vizError && (
+                                <div className="viz-results">
+                                    {/* Step counter + controls */}
+                                    <div className="viz-step-bar">
+                                        <span className="viz-step-counter">
+                                            Step {currentStepIndex + 1} / {steps.length}
+                                        </span>
+                                        <div className="viz-step-buttons">
+                                            <button
+                                                className="btn-step"
+                                                onClick={handleReset}
+                                                disabled={currentStepIndex === 0}
+                                                title="Reset"
+                                            >
+                                                <RotateCcw size={14} />
+                                            </button>
+                                            <button
+                                                className="btn-step"
+                                                onClick={handlePrevStep}
+                                                disabled={currentStepIndex === 0}
+                                                title="Previous step"
+                                            >
+                                                <SkipBack size={14} />
+                                            </button>
+                                            <button
+                                                className="btn-step"
+                                                onClick={handleNextStep}
+                                                disabled={currentStepIndex === steps.length - 1}
+                                                title="Next step"
+                                            >
+                                                <SkipForward size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Code panel with line highlighting */}
+                                    <div className="viz-code-panel">
+                                        {snippet.code.split("\n").map((line, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`viz-code-line ${currentStep && currentStep.line === idx + 1
+                                                    ? "viz-line-active"
+                                                    : ""
+                                                    }`}
+                                            >
+                                                <span className="viz-line-num">{idx + 1}</span>
+                                                <span className="viz-line-text">{line || " "}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Execution state panel */}
+                                    {currentStep && (
+                                        <div className="viz-state-panel">
+                                            <h4 className="viz-state-title">Execution State</h4>
+
+                                            {/* Variables */}
+                                            {Object.keys(currentStep.variables).length > 0 && (
+                                                <div className="viz-state-section">
+                                                    <span className="viz-state-label">Variables</span>
+                                                    <div className="viz-var-grid">
+                                                        {Object.entries(currentStep.variables).map(([name, val]) => (
+                                                            <div key={name} className="viz-var-chip">
+                                                                <span className="viz-var-name">{name}</span>
+                                                                <span className="viz-var-eq">=</span>
+                                                                <span className="viz-var-value">{val}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Arrays */}
+                                            {Object.keys(currentStep.arrays).length > 0 && (
+                                                <div className="viz-state-section">
+                                                    <span className="viz-state-label">Arrays</span>
+                                                    {Object.entries(currentStep.arrays).map(([name, values]) => (
+                                                        <div key={name} className="viz-array-row">
+                                                            <span className="viz-var-name">{name}</span>
+                                                            <span className="viz-var-eq">=</span>
+                                                            <div className="viz-array-cells">
+                                                                {values.map((v, i) => (
+                                                                    <span key={i} className="viz-array-cell">
+                                                                        {v}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Output */}
+                                            {currentStep.output && currentStep.output.length > 0 && (
+                                                <div className="viz-state-section">
+                                                    <span className="viz-state-label">
+                                                        <Terminal size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
+                                                        Output
+                                                    </span>
+                                                    <div className="viz-output-panel">
+                                                        {currentStep.output.map((line, i) => (
+                                                            <div key={i} className="viz-output-line">{line}</div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Empty state - no steps yet */}
+                            {steps.length === 0 && !vizError && (
+                                <div className="viz-empty">
+                                    <Monitor size={32} className="viz-empty-icon" />
+                                    <p>Click <strong>Run Visualization</strong> to step through your code.</p>
+                                    <p className="viz-empty-hint">
+                                        Learning visualizer — supports variables, loops, if/else, and simple arrays.
+                                    </p>
                                 </div>
                             )}
                         </div>
