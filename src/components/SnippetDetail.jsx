@@ -3,11 +3,14 @@
 // ==========================================
 // Split view with:
 //   - Top: Code editor panel
-//   - Bottom: Tabs (Details | AI Notes | Visualize)
+//   - Bottom: Tabs (Details | AI Notes)
+//   - Visualize opens in a fullscreen modal
 // ==========================================
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { visualizeSnippet } from "../utils/visualizer";
+import { generateVisualizerInputs } from "../utils/groq";
 import {
     Copy,
     Check,
@@ -34,7 +37,8 @@ import {
     RotateCcw,
     Monitor,
     AlertCircle,
-    Terminal
+    Terminal,
+    X
 } from "lucide-react";
 
 // Collapsible accordion component with description
@@ -80,6 +84,23 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
     const [vizRunning, setVizRunning] = useState(false);
     const [dryRunInputs, setDryRunInputs] = useState(null);
     const [detectedLang, setDetectedLang] = useState("");
+    const [vizModalOpen, setVizModalOpen] = useState(false);
+    const [aiInputsFetched, setAiInputsFetched] = useState(false);
+
+    // Reset AI inputs state when snippet changes
+    useEffect(() => {
+        setAiInputsFetched(false);
+        setSteps([]);
+        setVizError("");
+        setDryRunInputs(null);
+    }, [snippet?.id]);
+
+    // Close modal with Escape key
+    useEffect(() => {
+        const handleEsc = (e) => { if (e.key === "Escape") setVizModalOpen(false); };
+        if (vizModalOpen) document.addEventListener("keydown", handleEsc);
+        return () => document.removeEventListener("keydown", handleEsc);
+    }, [vizModalOpen]);
 
     // Run visualization (unified)
     const handleRunVisualization = useCallback(() => {
@@ -110,7 +131,54 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
         } finally {
             setVizRunning(false);
         }
-    }, [snippet?.code]);
+    }, [snippet?.code, aiInputsFetched]);
+
+    // Enhanced visualization with AI inputs
+    const handleRunVisualizationWithAI = useCallback(async () => {
+        if (!snippet?.code) return;
+
+        // 1. Run immediate visualization with defaults
+        handleRunVisualization();
+
+        // 2. If we haven't fetched AI inputs yet, try to get them
+        if (!aiInputsFetched) {
+            setAiInputsFetched(true); // Mark as fetched to prevent double-call
+            try {
+                // Determine language first (fast)
+                const tempResult = visualizeSnippet(snippet.code);
+                if (tempResult.error || tempResult.language === "unsupported") return;
+
+                // Fetch smart inputs
+                const smartInputs = await generateVisualizerInputs(snippet.code, tempResult.language);
+
+                if (smartInputs) {
+                    // Re-run with smart inputs
+                    setVizRunning(true);
+                    const result = visualizeSnippet(snippet.code, smartInputs);
+
+                    if (!result.error) {
+                        setSteps(result.steps);
+                        setCurrentStepIndex(0);
+                        if (result.dryRunInputs) {
+                            setDryRunInputs(result.dryRunInputs);
+                        }
+                    }
+                    setVizRunning(false);
+                }
+            } catch (err) {
+                console.error("Failed to fetch smart inputs:", err);
+            }
+        }
+    }, [snippet?.code, aiInputsFetched, handleRunVisualization]);
+
+    // Open modal and auto-run
+    const openVizModal = useCallback(() => {
+        setVizModalOpen(true);
+        if (snippet?.code) {
+            // Use the enhanced runner
+            setTimeout(() => handleRunVisualizationWithAI(), 100);
+        }
+    }, [snippet?.code, handleRunVisualizationWithAI]);
 
     // Step controls
     const handlePrevStep = () => setCurrentStepIndex(i => Math.max(0, i - 1));
@@ -159,296 +227,292 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
     const hasNotes = notesStatus === "done" || (snippet.aiNotes && !isGenerating && !isError);
 
     return (
-        <div className="snippet-detail-tabbed">
-            {/* Top section - Code panel */}
-            <section className="detail-code-section">
-                <div className="code-panel-header">
-                    <div className="code-title-row">
-                        <FileCode size={18} className="code-title-icon" />
-                        <h2 className="code-title">{snippet.title || "Untitled"}</h2>
+        <>
+            <div className="snippet-detail-tabbed">
+                {/* Top section - Code panel */}
+                <section className="detail-code-section">
+                    <div className="code-panel-header">
+                        <div className="code-title-row">
+                            <FileCode size={18} className="code-title-icon" />
+                            <h2 className="code-title">{snippet.title || "Untitled"}</h2>
+                        </div>
+                        <button
+                            className="btn-copy"
+                            onClick={handleCopyCode}
+                            title="Copy code"
+                        >
+                            {copied ? <Check size={16} /> : <Copy size={16} />}
+                            <span>{copied ? "Copied" : "Copy"}</span>
+                        </button>
                     </div>
-                    <button
-                        className="btn-copy"
-                        onClick={handleCopyCode}
-                        title="Copy code"
-                    >
-                        {copied ? <Check size={16} /> : <Copy size={16} />}
-                        <span>{copied ? "Copied" : "Copy"}</span>
-                    </button>
-                </div>
-                <pre className="code-display">
-                    <code>{snippet.code}</code>
-                </pre>
-            </section>
+                    <pre className="code-display">
+                        <code>{snippet.code}</code>
+                    </pre>
+                </section>
 
-            {/* Bottom section - Tabs */}
-            <section className="detail-tabs-section">
-                {/* Tab headers */}
-                <div className="tabs-header" role="tablist">
-                    <button
-                        className={`tab-btn ${activeTab === "details" ? "active" : ""}`}
-                        onClick={() => setActiveTab("details")}
-                        role="tab"
-                        aria-selected={activeTab === "details"}
-                    >
-                        <Info size={16} />
-                        <span>Details</span>
-                    </button>
-                    <button
-                        className={`tab-btn ${activeTab === "notes" ? "active" : ""}`}
-                        onClick={() => setActiveTab("notes")}
-                        role="tab"
-                        aria-selected={activeTab === "notes"}
-                    >
-                        <BookOpen size={16} />
-                        <span>AI Notes</span>
-                        {isGenerating && <span className="tab-badge">...</span>}
-                    </button>
-                    <button
-                        className={`tab-btn ${activeTab === "visualize" ? "active" : ""}`}
-                        onClick={() => setActiveTab("visualize")}
-                        role="tab"
-                        aria-selected={activeTab === "visualize"}
-                    >
-                        <Monitor size={16} />
-                        <span>Visualize</span>
-                    </button>
-                </div>
+                {/* Bottom section - Tabs */}
+                <section className="detail-tabs-section">
+                    {/* Tab headers */}
+                    <div className="tabs-header" role="tablist">
+                        <button
+                            className={`tab-btn ${activeTab === "details" ? "active" : ""}`}
+                            onClick={() => setActiveTab("details")}
+                            role="tab"
+                            aria-selected={activeTab === "details"}
+                        >
+                            <Info size={16} />
+                            <span>Details</span>
+                        </button>
+                        <button
+                            className={`tab-btn ${activeTab === "notes" ? "active" : ""}`}
+                            onClick={() => setActiveTab("notes")}
+                            role="tab"
+                            aria-selected={activeTab === "notes"}
+                        >
+                            <BookOpen size={16} />
+                            <span>AI Notes</span>
+                            {isGenerating && <span className="tab-badge">...</span>}
+                        </button>
+                        <button
+                            className="tab-btn tab-btn-viz"
+                            onClick={openVizModal}
+                            role="tab"
+                        >
+                            <Monitor size={16} />
+                            <span>Visualize</span>
+                        </button>
+                    </div>
 
-                {/* Tab content */}
-                <div className="tab-content" role="tabpanel">
-                    {/* Details Tab */}
-                    {activeTab === "details" && (
-                        <div className="details-tab">
-                            {/* Topic */}
-                            <div className="detail-field">
-                                <label className="field-label">Topic</label>
-                                <div className="field-value topic-badge">
-                                    {snippet.topic || "No topic"}
-                                </div>
-                            </div>
-
-                            {/* Date */}
-                            <div className="detail-field">
-                                <label className="field-label">Created</label>
-                                <div className="field-value">
-                                    <Calendar size={14} />
-                                    <span>{snippet.createdAtReadable || "Unknown"}</span>
-                                </div>
-                            </div>
-
-                            {/* AI Tags */}
-                            {snippet.aiTags && snippet.aiTags.length > 0 && (
+                    {/* Tab content */}
+                    <div className="tab-content" role="tabpanel">
+                        {/* Details Tab */}
+                        {activeTab === "details" && (
+                            <div className="details-tab">
+                                {/* Topic */}
                                 <div className="detail-field">
-                                    <label className="field-label">
-                                        <Sparkles size={12} />
-                                        AI Tags
-                                    </label>
-                                    <div className="tags-display">
-                                        {snippet.aiTags.map((tag, i) => (
-                                            <span key={i} className="tag-ai">{tag}</span>
-                                        ))}
+                                    <label className="field-label">Topic</label>
+                                    <div className="field-value topic-badge">
+                                        {snippet.topic || "No topic"}
                                     </div>
                                 </div>
-                            )}
 
-                            {/* User Tags */}
-                            {snippet.tags && snippet.tags.length > 0 && (
+                                {/* Date */}
                                 <div className="detail-field">
-                                    <label className="field-label">
-                                        <Tag size={12} />
-                                        Tags
-                                    </label>
-                                    <div className="tags-display">
-                                        {snippet.tags
-                                            .filter(t => !snippet.aiTags?.includes(t))
-                                            .map((tag, i) => (
-                                                <span key={i} className="tag-user">{tag}</span>
+                                    <label className="field-label">Created</label>
+                                    <div className="field-value">
+                                        <Calendar size={14} />
+                                        <span>{snippet.createdAtReadable || "Unknown"}</span>
+                                    </div>
+                                </div>
+
+                                {/* AI Tags */}
+                                {snippet.aiTags && snippet.aiTags.length > 0 && (
+                                    <div className="detail-field">
+                                        <label className="field-label">
+                                            <Sparkles size={12} />
+                                            AI Tags
+                                        </label>
+                                        <div className="tags-display">
+                                            {snippet.aiTags.map((tag, i) => (
+                                                <span key={i} className="tag-ai">{tag}</span>
                                             ))}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                )}
 
-                    {/* AI Notes Tab */}
-                    {activeTab === "notes" && (
-                        <div className="notes-tab">
-                            {/* Loading state */}
-                            {isGenerating && (
-                                <div className="notes-loading">
-                                    <div className="loading-spinner-small"></div>
-                                    <span>Generating AI notes...</span>
-                                </div>
-                            )}
-
-                            {/* Failed state */}
-                            {!isGenerating && isError && (
-                                <div className="notes-failed">
-                                    <AlertTriangle size={20} />
-                                    <div className="notes-failed-text">
-                                        <span>AI notes failed to generate.</span>
-                                        <p>There was an error generating notes for this snippet.</p>
+                                {/* User Tags */}
+                                {snippet.tags && snippet.tags.length > 0 && (
+                                    <div className="detail-field">
+                                        <label className="field-label">
+                                            <Tag size={12} />
+                                            Tags
+                                        </label>
+                                        <div className="tags-display">
+                                            {snippet.tags
+                                                .filter(t => !snippet.aiTags?.includes(t))
+                                                .map((tag, i) => (
+                                                    <span key={i} className="tag-user">{tag}</span>
+                                                ))}
+                                        </div>
                                     </div>
-                                    {onRetryNotes && (
-                                        <button
-                                            className="btn-retry"
-                                            onClick={() => onRetryNotes(snippet)}
-                                        >
-                                            <RefreshCw size={14} />
-                                            Retry AI notes
-                                        </button>
-                                    )}
-                                </div>
-                            )}
+                                )}
+                            </div>
+                        )}
 
-                            {/* Success - Accordion sections */}
-                            {!isGenerating && !isError && snippet.aiNotes && typeof snippet.aiNotes === "object" && (
-                                <div className="notes-accordion-list">
-                                    {noteSections.map((section) => {
-                                        const content = snippet.aiNotes[section.key];
-                                        if (!content) return null;
+                        {/* AI Notes Tab */}
+                        {activeTab === "notes" && (
+                            <div className="notes-tab">
+                                {/* Loading state */}
+                                {isGenerating && (
+                                    <div className="notes-loading">
+                                        <div className="loading-spinner-small"></div>
+                                        <span>Generating AI notes...</span>
+                                    </div>
+                                )}
 
-                                        return (
-                                            <AccordionSection
-                                                key={section.key}
-                                                title={section.title}
-                                                description={section.desc}
-                                                icon={section.icon}
-                                                defaultOpen={section.open}
+                                {/* Failed state */}
+                                {!isGenerating && isError && (
+                                    <div className="notes-failed">
+                                        <AlertTriangle size={20} />
+                                        <div className="notes-failed-text">
+                                            <span>AI notes failed to generate.</span>
+                                            <p>There was an error generating notes for this snippet.</p>
+                                        </div>
+                                        {onRetryNotes && (
+                                            <button
+                                                className="btn-retry"
+                                                onClick={() => onRetryNotes(snippet)}
                                             >
-                                                <p>{content}</p>
-                                            </AccordionSection>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                                                <RefreshCw size={14} />
+                                                Retry AI notes
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
 
-                            {/* No notes yet */}
-                            {!isGenerating && !isError && !snippet.aiNotes && (
-                                <div className="notes-pending">
-                                    <Sparkles size={24} className="pending-icon" />
-                                    <span>AI notes not generated yet</span>
-                                    {onRetryNotes && (
-                                        <button
-                                            className="btn-generate"
-                                            onClick={() => onRetryNotes(snippet)}
-                                        >
-                                            <Sparkles size={14} />
-                                            Generate AI notes
-                                        </button>
-                                    )}
-                                </div>
-                            )}
+                                {/* Success - Accordion sections */}
+                                {!isGenerating && !isError && snippet.aiNotes && typeof snippet.aiNotes === "object" && (
+                                    <div className="notes-accordion-list">
+                                        {noteSections.map((section) => {
+                                            const content = snippet.aiNotes[section.key];
+                                            if (!content) return null;
 
-                            {/* Fallback for string notes */}
-                            {!isGenerating && !isError && snippet.aiNotes && typeof snippet.aiNotes === "string" && (
-                                <div className="notes-text">
-                                    <p>{snippet.aiNotes}</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                            return (
+                                                <AccordionSection
+                                                    key={section.key}
+                                                    title={section.title}
+                                                    description={section.desc}
+                                                    icon={section.icon}
+                                                    defaultOpen={section.open}
+                                                >
+                                                    <p>{content}</p>
+                                                </AccordionSection>
+                                            );
+                                        })}
+                                    </div>
+                                )}
 
-                    {/* Visualize Tab */}
-                    {activeTab === "visualize" && (
-                        <div className="visualize-tab">
-                            {/* Controls bar: just run button (language auto-detected) */}
-                            <div className="viz-controls-bar">
-                                <button
-                                    className="btn-run-viz"
-                                    onClick={handleRunVisualization}
-                                    disabled={vizRunning}
-                                >
-                                    <Play size={14} />
-                                    {vizRunning ? "Running..." : "Run Visualization"}
-                                </button>
+                                {/* No notes yet */}
+                                {!isGenerating && !isError && !snippet.aiNotes && (
+                                    <div className="notes-pending">
+                                        <Sparkles size={24} className="pending-icon" />
+                                        <span>AI notes not generated yet</span>
+                                        {onRetryNotes && (
+                                            <button
+                                                className="btn-generate"
+                                                onClick={() => onRetryNotes(snippet)}
+                                            >
+                                                <Sparkles size={14} />
+                                                Generate AI notes
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Fallback for string notes */}
+                                {!isGenerating && !isError && snippet.aiNotes && typeof snippet.aiNotes === "string" && (
+                                    <div className="notes-text">
+                                        <p>{snippet.aiNotes}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </section>
+            </div>
+
+            {/* ===== Visualizer Modal (portalled to body) ===== */}
+            {vizModalOpen && createPortal(
+                <div className="viz-modal-overlay" onClick={() => setVizModalOpen(false)}>
+                    <div className="viz-modal" onClick={(e) => e.stopPropagation()}>
+                        {/* Modal header */}
+                        <div className="viz-modal-header">
+                            <div className="viz-modal-title-row">
+                                <Monitor size={20} />
+                                <h2>Code Visualizer</h2>
                                 {detectedLang && (
                                     <span className="viz-detected-lang">
-                                        Detected: <strong>{detectedLang === "java" ? "Java" : "C++"}</strong>
+                                        {detectedLang === "java" ? "Java" : "C++"}
                                     </span>
                                 )}
                             </div>
+                            <div className="viz-modal-actions">
+                                <button
+                                    className="btn-run-viz"
+                                    onClick={handleRunVisualizationWithAI}
+                                    disabled={vizRunning}
+                                >
+                                    <Play size={14} />
+                                    {vizRunning ? "Running..." : "Re-run"}
+                                </button>
+                                <button className="viz-modal-close" onClick={() => setVizModalOpen(false)}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+                        </div>
 
-                            {/* Dry-run inputs panel */}
-                            {dryRunInputs && Object.keys(dryRunInputs).length > 0 && (
-                                <div className="viz-dryrun-panel">
-                                    <span className="viz-dryrun-label">Dry-run inputs:</span>
-                                    <div className="viz-dryrun-values">
-                                        {Object.entries(dryRunInputs).map(([name, display]) => (
-                                            <span key={name} className="viz-var-chip">
-                                                <span className="viz-var-name">{name}</span>
-                                                <span className="viz-var-eq">=</span>
-                                                <span className="viz-var-value">{display}</span>
-                                            </span>
-                                        ))}
-                                    </div>
+                        {/* Dry-run inputs */}
+                        {dryRunInputs && Object.keys(dryRunInputs).length > 0 && (
+                            <div className="viz-dryrun-panel">
+                                <span className="viz-dryrun-label">Dry-run inputs:</span>
+                                <div className="viz-dryrun-values">
+                                    {Object.entries(dryRunInputs).map(([name, display]) => (
+                                        <span key={name} className="viz-var-chip">
+                                            <span className="viz-var-name">{name}</span>
+                                            <span className="viz-var-eq">=</span>
+                                            <span className="viz-var-value">{display}</span>
+                                        </span>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {/* Error state */}
-                            {vizError && (
-                                <div className="viz-error">
-                                    <AlertCircle size={18} />
-                                    <span>{vizError}</span>
-                                </div>
-                            )}
+                        {/* Error state */}
+                        {vizError && (
+                            <div className="viz-error">
+                                <AlertCircle size={18} />
+                                <span>{vizError}</span>
+                            </div>
+                        )}
 
-                            {/* Visualization results */}
-                            {steps.length > 0 && !vizError && (
-                                <div className="viz-results">
-                                    {/* Step counter + controls */}
+                        {/* Modal body — two-column layout */}
+                        {steps.length > 0 && !vizError && (
+                            <div className="viz-modal-body">
+                                {/* Left column: Code */}
+                                <div className="viz-modal-code-col">
                                     <div className="viz-step-bar">
                                         <span className="viz-step-counter">
                                             Step {currentStepIndex + 1} / {steps.length}
                                         </span>
                                         <div className="viz-step-buttons">
-                                            <button
-                                                className="btn-step"
-                                                onClick={handleReset}
-                                                disabled={currentStepIndex === 0}
-                                                title="Reset"
-                                            >
+                                            <button className="btn-step" onClick={handleReset} disabled={currentStepIndex === 0} title="Reset">
                                                 <RotateCcw size={14} />
                                             </button>
-                                            <button
-                                                className="btn-step"
-                                                onClick={handlePrevStep}
-                                                disabled={currentStepIndex === 0}
-                                                title="Previous step"
-                                            >
+                                            <button className="btn-step" onClick={handlePrevStep} disabled={currentStepIndex === 0} title="Previous">
                                                 <SkipBack size={14} />
                                             </button>
-                                            <button
-                                                className="btn-step"
-                                                onClick={handleNextStep}
-                                                disabled={currentStepIndex === steps.length - 1}
-                                                title="Next step"
-                                            >
+                                            <button className="btn-step" onClick={handleNextStep} disabled={currentStepIndex === steps.length - 1} title="Next">
                                                 <SkipForward size={14} />
                                             </button>
                                         </div>
                                     </div>
-
-                                    {/* Code panel with line highlighting */}
                                     <div className="viz-code-panel">
                                         {snippet.code.split("\n").map((line, idx) => (
                                             <div
                                                 key={idx}
-                                                className={`viz-code-line ${currentStep && currentStep.line === idx + 1
-                                                    ? "viz-line-active"
-                                                    : ""
-                                                    }`}
+                                                className={`viz-code-line ${currentStep && currentStep.line === idx + 1 ? "viz-line-active" : ""}`}
                                             >
                                                 <span className="viz-line-num">{idx + 1}</span>
                                                 <span className="viz-line-text">{line || " "}</span>
                                             </div>
                                         ))}
                                     </div>
+                                </div>
 
-                                    {/* Execution state panel */}
+                                {/* Right column: Execution State */}
+                                <div className="viz-modal-state-col">
                                     {currentStep && (
-                                        <div className="viz-state-panel">
+                                        <>
                                             <h4 className="viz-state-title">Execution State</h4>
 
                                             {/* Variables */}
@@ -460,7 +524,9 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
                                                             <div key={name} className="viz-var-chip">
                                                                 <span className="viz-var-name">{name}</span>
                                                                 <span className="viz-var-eq">=</span>
-                                                                <span className="viz-var-value">{val}</span>
+                                                                <span className="viz-var-value">
+                                                                    {val && typeof val === "object" && val.value !== undefined ? val.value : val}
+                                                                </span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -477,9 +543,7 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
                                                             <span className="viz-var-eq">=</span>
                                                             <div className="viz-array-cells">
                                                                 {values.map((v, i) => (
-                                                                    <span key={i} className="viz-array-cell">
-                                                                        {v}
-                                                                    </span>
+                                                                    <span key={i} className="viz-array-cell">{v}</span>
                                                                 ))}
                                                             </div>
                                                         </div>
@@ -501,26 +565,34 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes }) {
                                                     </div>
                                                 </div>
                                             )}
+                                        </>
+                                    )}
+
+                                    {!currentStep && (
+                                        <div className="viz-empty" style={{ padding: '2rem' }}>
+                                            <Monitor size={28} className="viz-empty-icon" />
+                                            <p>Loading visualization...</p>
                                         </div>
                                     )}
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {/* Empty state - no steps yet */}
-                            {steps.length === 0 && !vizError && (
-                                <div className="viz-empty">
-                                    <Monitor size={32} className="viz-empty-icon" />
-                                    <p>Click <strong>Run Visualization</strong> to step through your code.</p>
-                                    <p className="viz-empty-hint">
-                                        Learning visualizer — supports variables, loops, if/else, and simple arrays.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </section>
-        </div>
+                        {/* Empty / initial state inside modal */}
+                        {steps.length === 0 && !vizError && (
+                            <div className="viz-empty" style={{ padding: '3rem' }}>
+                                <Monitor size={40} className="viz-empty-icon" />
+                                <p>Click <strong>Re-run</strong> to step through your code.</p>
+                                <p className="viz-empty-hint">
+                                    Learning visualizer — supports variables, loops, if/else, and simple arrays.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>,
+                document.body
+            )}
+        </>
     );
 }
 

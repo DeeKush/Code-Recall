@@ -199,3 +199,35 @@ export async function generateSnippetNotes(code, title = "", topic = "") {
         { role: "user", content: prompt }
     ]);
 }
+/**
+ * 3. Generate Visualizer Inputs (Day 6 Extension)
+ * Returns: { inputs: { varName: value, ... } }
+ */
+export async function generateVisualizerInputs(code, language = "java") {
+    if (GROQ_KEYS.length === 0 && !OPENROUTER_KEY) return null;
+
+    const prompt = `
+    Analyze this ${language} code.
+    Identify the entry function and its parameters.
+    Generate a SINGLE best test case to demonstrate the logic (e.g., an interesting edge case or typical usage).
+    Return a strictly valid JSON object (no markdown) with a key "inputs" containing parameter names and values.
+
+    Example:
+    Code: int binarySearch(int[] arr, int target)
+    Output: { "inputs": { "arr": [1, 3, 5, 7, 9], "target": 5 } }
+
+    Code:
+    ${code.slice(0, 2000)}
+    `;
+
+    try {
+        const result = await callAI([
+            { role: "system", content: "You are a QA engineer. You generate meaningful test cases. You strictly output JSON." },
+            { role: "user", content: prompt }
+        ]);
+        return result.inputs || null;
+    } catch (err) {
+        console.warn("[AI] Failed to generate inputs:", err);
+        return null;
+    }
+}

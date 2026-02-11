@@ -140,12 +140,23 @@ function parseParameters(paramStr, lang) {
 /**
  * Generate test inputs for function parameters.
  * @param {Array<{name: string, type: string}>} parameters
+ * @param {Object} [customInputs] - Optional kv pairs of variable inputs
  * @returns {Object} map of param name → generated value (as display string + actual value)
  */
-export function generateTestInputs(parameters) {
+export function generateTestInputs(parameters, customInputs = {}) {
     const inputs = {};
 
     for (const param of parameters) {
+        // Use custom input if available
+        if (customInputs && customInputs[param.name] !== undefined) {
+            const val = customInputs[param.name];
+            inputs[param.name] = {
+                display: Array.isArray(val) ? JSON.stringify(val) : String(val),
+                value: val
+            };
+            continue;
+        }
+
         const t = param.type.replace(/\s/g, "").toLowerCase();
 
         if (t === "int" || t === "long") {
@@ -249,7 +260,9 @@ function buildSyntheticBody(code, funcInfo, testInputs, lang) {
                 preamble.push(`vector<int> ${param.name} = {${input.value.join(", ")}};`);
             }
         } else {
-            preamble.push(`int ${param.name} = ${input.value};`);
+            // For strings or other primitives, use the value directly
+            const val = typeof input.value === "string" ? `"${input.value}"` : input.value;
+            preamble.push(`int ${param.name} = ${val};`); // Keeping 'int' for parser, but value is string
         }
     }
 
@@ -266,7 +279,9 @@ function buildSyntheticBody(code, funcInfo, testInputs, lang) {
 
 function cloneState(variables, arrays, output) {
     return {
-        variables: { ...variables },
+        variables: Object.fromEntries(
+            Object.entries(variables).map(([k, v]) => [k, { ...v }])
+        ),
         arrays: Object.fromEntries(
             Object.entries(arrays).map(([k, v]) => [k, [...v]])
         ),
@@ -275,116 +290,46 @@ function cloneState(variables, arrays, output) {
 }
 
 function evaluateExpression(expr, variables, arrays) {
-    expr = expr.trim();
+    if (!expr) return 0;
 
-    // Replace arr.length with the array's length
-    expr = expr.replace(/(\w+)\.length/g, (match, arrName) => {
-        if (arrays[arrName]) return String(arrays[arrName].length);
-        if (variables[arrName] !== undefined) return String(variables[arrName]);
-        throw new Error(`Unknown array for .length: ${arrName}`);
-    });
+    // 1. Basic Java -> JS syntax adjustments
+    let jsExpr = expr.trim()
+        .replace(/(\w+)\.length\(\)/g, "$1.length")   // s.length() -> s.length
+        .replace(/(\w+)\.size\(\)/g, "$1.length")     // v.size() -> v.length
+        .replace(/(\d+)L\b/g, "$1")                   // 100L -> 100
+        .replace(/\b([0-9]*\.[0-9]+)[fF]\b/g, "$1");  // 3.14f -> 3.14
 
-    // Replace arr.size() with the array's length (C++ vector)
-    expr = expr.replace(/(\w+)\.size\(\)/g, (match, arrName) => {
-        if (arrays[arrName]) return String(arrays[arrName].length);
-        throw new Error(`Unknown vector for .size(): ${arrName}`);
-    });
+    // 2. Prepare function arguments from variable scope (handling {type, value} objects)
+    const varNames = Object.keys(variables);
+    const varValues = varNames.map(n => variables[n]?.value ?? variables[n]);
 
-    // Replace array access like arr[i] with their values
-    expr = expr.replace(/(\w+)\[([^\]]+)\]/g, (match, arrName, indexExpr) => {
-        const index = evaluateExpression(indexExpr, variables, arrays);
-        if (arrays[arrName] && index >= 0 && index < arrays[arrName].length) {
-            return String(arrays[arrName][index]);
-        }
-        throw new Error(`Array access error: ${match}`);
-    });
+    const arrNames = Object.keys(arrays);
+    const arrValues = arrNames.map(n => arrays[n]);
 
-    // Replace variable names with their values (longest first)
-    const varNames = Object.keys(variables).sort((a, b) => b.length - a.length);
-    for (const name of varNames) {
-        const regex = new RegExp(`\\b${name}\\b`, "g");
-        expr = expr.replace(regex, String(variables[name]));
+    const allNames = [...varNames, ...arrNames];
+    const allValues = [...varValues, ...arrValues];
+
+    // 3. Evaluate safely using Function constructor
+    try {
+        const func = new Function(...allNames, "return " + jsExpr);
+        return func(...allValues);
+    } catch (err) {
+        // Fallback: try to interpret as simple number if eval failed (e.g. integer literal)
+        if (!isNaN(expr)) return Number(expr);
+        throw new Error(`Eval failed for "${expr}": ${err.message}`);
     }
-
-    return parseAddSub(expr.replace(/\s/g, ""), { pos: 0 });
-}
-
-function parseAddSub(expr, state) {
-    let result = parseMulDiv(expr, state);
-    while (state.pos < expr.length) {
-        const ch = expr[state.pos];
-        if (ch === "+" || ch === "-") {
-            state.pos++;
-            const right = parseMulDiv(expr, state);
-            result = ch === "+" ? result + right : result - right;
-        } else break;
-    }
-    return result;
-}
-
-function parseMulDiv(expr, state) {
-    let result = parseUnary(expr, state);
-    while (state.pos < expr.length) {
-        const ch = expr[state.pos];
-        if (ch === "*" || ch === "/" || ch === "%") {
-            state.pos++;
-            const right = parseUnary(expr, state);
-            if (ch === "*") result = result * right;
-            else if (ch === "/") result = Math.trunc(result / right);
-            else result = result % right;
-        } else break;
-    }
-    return result;
-}
-
-function parseUnary(expr, state) {
-    if (state.pos < expr.length && expr[state.pos] === "-") {
-        state.pos++;
-        return -parseUnary(expr, state);
-    }
-    return parseAtom(expr, state);
-}
-
-function parseAtom(expr, state) {
-    if (expr[state.pos] === "(") {
-        state.pos++;
-        const result = parseAddSub(expr, state);
-        state.pos++; // skip ')'
-        return result;
-    }
-    const start = state.pos;
-    while (state.pos < expr.length && /[0-9]/.test(expr[state.pos])) {
-        state.pos++;
-    }
-    const numStr = expr.substring(start, state.pos);
-    if (numStr.length === 0) {
-        throw new Error(`Unexpected token at position ${state.pos} in: ${expr}`);
-    }
-    return parseInt(numStr, 10);
 }
 
 function evaluateCondition(condStr, variables, arrays) {
-    condStr = condStr.trim();
-    if (condStr.includes("&&") || condStr.includes("||")) {
-        throw new Error("Logical AND/OR not supported.");
-    }
-    const operators = ["<=", ">=", "!=", "==", "<", ">"];
-    let op = null, splitIndex = -1;
-    for (const candidate of operators) {
-        const idx = condStr.indexOf(candidate);
-        if (idx !== -1) { op = candidate; splitIndex = idx; break; }
-    }
-    if (!op) throw new Error(`Cannot parse condition: ${condStr}`);
-    const left = evaluateExpression(condStr.substring(0, splitIndex), variables, arrays);
-    const right = evaluateExpression(condStr.substring(splitIndex + op.length), variables, arrays);
-    switch (op) {
-        case "<": return left < right;
-        case ">": return left > right;
-        case "<=": return left <= right;
-        case ">=": return left >= right;
-        case "==": return left === right;
-        case "!=": return left !== right;
-        default: return false;
+    // With the new evaluator, conditions are just expressions returning boolean
+    try {
+        const res = evaluateExpression(condStr, variables, arrays);
+        return !!res;
+    } catch (err) {
+        // Fallback for simple boolean text
+        if (condStr === "true") return true;
+        if (condStr === "false") return false;
+        throw new Error(`Condition error "${condStr}": ${err.message}`);
     }
 }
 
@@ -395,8 +340,10 @@ function cleanLine(line) {
 
 // ============ LINE CLASSIFIERS ============
 
-function isIntDeclaration(line) {
-    return /^int\s+\w+\s*(=\s*.+)?$/.test(line);
+// ============ LINE CLASSIFIERS ============
+
+function isVarDeclaration(line) {
+    return /^(?:int|long|double|float|char|boolean|bool|string|String)\s+\w+\s*(=\s*.+)?$/.test(line);
 }
 
 function isAssignment(line) {
@@ -426,30 +373,62 @@ function isArrayAssignment(line) { return /^\w+\[\s*[^\]]+\s*\]\s*=\s*.+$/.test(
 
 // ============ STATEMENT EXECUTORS ============
 
-function executeIntDeclaration(line, variables, arrays) {
-    const match = line.match(/^int\s+(\w+)\s*(?:=\s*(.+))?$/);
-    if (!match) throw new Error(`Cannot parse int declaration: ${line}`);
-    const name = match[1];
-    const value = match[2] ? evaluateExpression(match[2], variables, arrays) : 0;
-    return { name, value };
+function executeVarDeclaration(line, variables, arrays) {
+    // Capture type in group 1
+    const match = line.match(/^((?:int|long|double|float|char|boolean|bool|string|String))\s+(\w+)\s*(?:=\s*(.+))?$/);
+    if (!match) throw new Error(`Cannot parse var declaration: ${line}`);
+    const type = match[1];
+    const name = match[2];
+    let value = match[3] ? evaluateExpression(match[3], variables, arrays) : 0;
+
+    // Enforce integer truncation
+    if (["int", "long", "short", "byte", "char"].includes(type) && typeof value === "number") {
+        value = Math.trunc(value);
+    }
+
+    return { name, value: { type, value } };
 }
 
 function executeAssignment(line, variables, arrays) {
     const match = line.match(/^(\w+)\s*=\s*(.+)$/);
     if (!match) throw new Error(`Cannot parse assignment: ${line}`);
-    return { name: match[1], value: evaluateExpression(match[2], variables, arrays) };
+    const name = match[1];
+    let value = evaluateExpression(match[2], variables, arrays);
+
+    // Check existing type and truncate if needed
+    const existing = variables[name];
+    if (existing && ["int", "long", "short", "byte", "char"].includes(existing.type) && typeof value === "number") {
+        value = Math.trunc(value);
+    }
+
+    // Preserve type if exists, else assume inferred or dynamic
+    const newObj = existing ? { ...existing, value } : { type: "unknown", value };
+    return { name, value: newObj };
 }
 
 function executeIncrementDecrement(line, variables) {
     let match = line.match(/^(\w+)\+\+$/);
-    if (match) return { name: match[1], value: (variables[match[1]] ?? 0) + 1 };
+    if (match) return updateIncDec(match[1], 1, variables);
     match = line.match(/^(\w+)--$/);
-    if (match) return { name: match[1], value: (variables[match[1]] ?? 0) - 1 };
+    if (match) return updateIncDec(match[1], -1, variables);
     match = line.match(/^\+\+(\w+)$/);
-    if (match) return { name: match[1], value: (variables[match[1]] ?? 0) + 1 };
+    if (match) return updateIncDec(match[1], 1, variables);
     match = line.match(/^--(\w+)$/);
-    if (match) return { name: match[1], value: (variables[match[1]] ?? 0) - 1 };
+    if (match) return updateIncDec(match[1], -1, variables);
     throw new Error(`Cannot parse increment/decrement: ${line}`);
+}
+
+function updateIncDec(name, delta, variables) {
+    const existing = variables[name];
+    const currentVal = existing?.value ?? existing ?? 0;
+    let newVal = currentVal + delta;
+
+    if (existing && ["int", "long", "short", "byte", "char"].includes(existing.type)) {
+        newVal = Math.trunc(newVal); // Should be int anyway, but safe
+    }
+
+    const newObj = existing ? { ...existing, value: newVal } : { type: "int", value: newVal };
+    return { name, value: newObj };
 }
 
 function executeCompoundAssignment(line, variables, arrays) {
@@ -457,17 +436,27 @@ function executeCompoundAssignment(line, variables, arrays) {
     if (!match) throw new Error(`Cannot parse compound assignment: ${line}`);
     const name = match[1], op = match[2];
     const rightVal = evaluateExpression(match[3], variables, arrays);
-    const current = variables[name] ?? 0;
+
+    const existing = variables[name];
+    const current = existing?.value ?? existing ?? 0;
+
     let value;
     switch (op) {
         case "+=": value = current + rightVal; break;
         case "-=": value = current - rightVal; break;
         case "*=": value = current * rightVal; break;
-        case "/=": value = Math.trunc(current / rightVal); break;
+        case "/=": value = Math.trunc(current / rightVal); break; // integer division if int? No, JS division.
         case "%=": value = current % rightVal; break;
         default: throw new Error(`Unknown operator: ${op}`);
     }
-    return { name, value };
+
+    // Enforce type truncation
+    if (existing && ["int", "long", "short", "byte", "char"].includes(existing.type)) {
+        value = Math.trunc(value);
+    }
+
+    const newObj = existing ? { ...existing, value } : { type: "unknown", value };
+    return { name, value: newObj };
 }
 
 function executeJavaArrayDecl(line, variables, arrays) {
@@ -629,10 +618,11 @@ function interpret(code, language) {
         if (raw.startsWith("void ")) return true;
         // Print and return statements are handled separately (not skipped)
         if (raw.startsWith("cin") || raw.startsWith("scanf")) return true;
-        if (raw.startsWith("String ") || raw.startsWith("string ")) return true;
-        if (raw.startsWith("double ") || raw.startsWith("float ")) return true;
-        if (raw.startsWith("boolean ") || raw.startsWith("bool ")) return true;
-        if (raw.startsWith("char ") || raw.startsWith("long ")) return true;
+        if (raw.startsWith("cin") || raw.startsWith("scanf")) return true;
+        // if (raw.startsWith("String ") || raw.startsWith("string ")) return true; // Don't skip strings!
+        // if (raw.startsWith("double ") || raw.startsWith("float ")) return true;
+        // if (raw.startsWith("boolean ") || raw.startsWith("bool ")) return true;
+        // if (raw.startsWith("char ") || raw.startsWith("long ")) return true;
         if (raw.startsWith("new ")) return true;
         // Function calls (not for/if/while/else)
         if (/^\w+\s*\(/.test(raw) && !/^(for|if|else|while)\b/.test(raw)) return true;
@@ -715,8 +705,8 @@ function interpret(code, language) {
                 executeArrayAssignment(cleaned, variables, arrays);
                 addStep(lineIdx + 1); return lineIdx + 1;
             }
-            if (isIntDeclaration(cleaned)) {
-                const r = executeIntDeclaration(cleaned, variables, arrays);
+            if (isVarDeclaration(cleaned)) {
+                const r = executeVarDeclaration(cleaned, variables, arrays);
                 variables[r.name] = r.value; addStep(lineIdx + 1); return lineIdx + 1;
             }
             if (isIncrementDecrement(cleaned)) {
@@ -750,8 +740,8 @@ function interpret(code, language) {
         const bodyEnd = rawLines[blockEnd].trim() === "}" ? blockEnd - 1 : blockEnd;
 
         const initCleaned = cleanLine(header.initLine);
-        if (isIntDeclaration(initCleaned)) {
-            const r = executeIntDeclaration(initCleaned, variables, arrays);
+        if (isVarDeclaration(initCleaned)) {
+            const r = executeVarDeclaration(initCleaned, variables, arrays);
             variables[r.name] = r.value;
             addStep(lineIdx + 1);
         }
@@ -883,9 +873,10 @@ export function visualizeCpp(code) { return interpret(code, "cpp"); }
  * 5. Runs interpreter
  *
  * @param {string} code
+ * @param {Object} [customInputs] - Optional kv pairs of variable inputs
  * @returns {{ steps: Array, language: string, dryRunInputs: Object|null, error: string|null }}
  */
-export function visualizeSnippet(code) {
+export function visualizeSnippet(code, customInputs = null) {
     try {
         // 1. Language detection
         const language = detectLanguage(code);
@@ -900,7 +891,7 @@ export function visualizeSnippet(code) {
 
         // 3 & 4. If function detected, build synthetic body
         if (funcInfo && funcInfo.parameters.length > 0) {
-            const testInputs = generateTestInputs(funcInfo.parameters);
+            const testInputs = generateTestInputs(funcInfo.parameters, customInputs);
             dryRunInputs = {};
             for (const [name, info] of Object.entries(testInputs)) {
                 dryRunInputs[name] = info.display;
