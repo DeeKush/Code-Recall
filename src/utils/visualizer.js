@@ -299,6 +299,8 @@ function evaluateExpression(expr, variables, arrays) {
         .replace(/(\d+)L\b/g, "$1")                   // 100L -> 100
         .replace(/\b([0-9]*\.[0-9]+)[fF]\b/g, "$1");  // 3.14f -> 3.14
 
+
+
     // 2. Prepare function arguments from variable scope (handling {type, value} objects)
     const varNames = Object.keys(variables);
     const varValues = varNames.map(n => variables[n]?.value ?? variables[n]);
@@ -308,6 +310,8 @@ function evaluateExpression(expr, variables, arrays) {
 
     const allNames = [...varNames, ...arrNames];
     const allValues = [...varValues, ...arrValues];
+
+
 
     // 3. Evaluate safely using Function constructor
     try {
@@ -324,11 +328,13 @@ function evaluateCondition(condStr, variables, arrays) {
     // With the new evaluator, conditions are just expressions returning boolean
     try {
         const res = evaluateExpression(condStr, variables, arrays);
+
         return !!res;
     } catch (err) {
         // Fallback for simple boolean text
         if (condStr === "true") return true;
         if (condStr === "false") return false;
+
         throw new Error(`Condition error "${condStr}": ${err.message}`);
     }
 }
@@ -463,6 +469,7 @@ function executeJavaArrayDecl(line, variables, arrays) {
     const match = line.match(/^int\[\]\s+(\w+)\s*=\s*\{([^}]*)\}/);
     if (!match) throw new Error(`Cannot parse Java array: ${line}`);
     const values = match[2].split(",").map(v => evaluateExpression(v.trim(), variables, arrays));
+    console.log(`DEBUG: executeJavaArrayDecl ${match[1]} =`, values);
     return { name: match[1], values };
 }
 
@@ -521,6 +528,37 @@ function extractWhileCondition(line) {
 
 function findBlockEnd(lines, startIndex) {
     let depth = 0;
+    let hasBraces = false;
+
+    // First check if the start line itself has an opening brace
+    if (lines[startIndex].includes("{")) {
+        hasBraces = true;
+    }
+    // Or if the next line has an opening brace (formatting style)
+    else if (lines[startIndex + 1]?.trim() === "{") {
+        hasBraces = true;
+    }
+
+    if (!hasBraces) {
+        // Single-line block logic
+        const line = lines[startIndex].trim();
+
+        // case: if (cond) stmt;
+        if (line.includes("if") && line.includes(")")) {
+            const afterCond = line.substring(line.lastIndexOf(")") + 1).trim();
+            if (afterCond.length > 0 && !afterCond.startsWith("{")) return startIndex;
+        }
+
+        // case: else stmt;
+        if (line.startsWith("else") && !line.includes("if")) {
+            const afterElse = line.replace("else", "").trim();
+            if (afterElse.length > 0 && !afterElse.startsWith("{")) return startIndex;
+        }
+
+        // Default: assume next line is the single-statement body
+        return startIndex + 1;
+    }
+
     for (let i = startIndex; i < lines.length; i++) {
         const line = lines[i].trim();
         for (const ch of line) {
@@ -532,17 +570,88 @@ function findBlockEnd(lines, startIndex) {
 }
 
 
+// ============ PREPROCESSOR ============
+
+function preprocessCode(code) {
+    const lines = code.split("\n");
+    const output = [];
+
+    for (const line of lines) {
+        let trimmed = line.trim();
+        // Skip comments/directives
+        if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("/*")) {
+            output.push(line);
+            continue;
+        }
+
+        // Handle single-line `if/while/for (...) stmt;`
+        let match = null;
+
+        // if/else if/while
+        if (/^(?:else\s+)?(?:if|while)\s*\(/.test(trimmed)) {
+            // Find end of condition
+            let depth = 0;
+            let splitIdx = -1;
+            for (let i = 0; i < line.length; i++) {
+                if (line[i] === "(") depth++;
+                else if (line[i] === ")") {
+                    depth--;
+                    if (depth === 0) {
+                        // End of condition found at i
+                        // Check what follows
+                        const after = line.substring(i + 1).trim();
+                        if (after.length > 0 && after !== "{" && !after.startsWith("{")) {
+                            splitIdx = i + 1;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (splitIdx !== -1) {
+                const head = line.substring(0, splitIdx);
+                const body = line.substring(splitIdx).trim();
+                output.push(head);
+                output.push("    " + body); // Indent body
+                continue;
+            }
+        }
+
+        // else stmt; (without if)
+        else if (/^else\s*$/.test(trimmed) === false && /^else\s+[^if]/.test(trimmed)) {
+            const after = trimmed.substring(4).trim(); // removing "else"
+            if (after.length > 0 && after !== "{" && !after.startsWith("{")) {
+                const elseIdx = line.indexOf("else");
+                const indent = line.substring(0, elseIdx);
+                output.push(indent + "else");
+                output.push(indent + "    " + after);
+                continue;
+            }
+        }
+
+        output.push(line);
+    }
+    return output.join("\n");
+}
+
+
 // ============ MAIN INTERPRETER ============
 
 function interpret(code, language) {
-    const rawLines = code.split("\n");
+    const MAX_STEPS = 500;
+    const MAX_LOOP_ITERATIONS = 50;
+
+    const preprocessed = preprocessCode(code);
+    const rawLines = preprocessed.split("\n");
     const steps = [];
     const variables = {};
     const arrays = {};
     const output = [];  // Captured print output
 
-    const MAX_STEPS = 500;
-    const MAX_LOOP_ITERATIONS = 50;
+    // DEBUG: Output preprocessed code to verify splitting
+    // output.push("DEBUG: Preprocessed code:");
+    // preprocessed.split("\n").forEach((l, i) => output.push(`${i}: ${l}`));
+    // addStep(0);
 
     function addStep(lineNumber) {
         const state = cloneState(variables, arrays, output);
@@ -668,15 +777,19 @@ function interpret(code, language) {
         if (raw.startsWith("return")) {
             try {
                 const retExpr = cleanLine(raw).replace(/^return\s*/, "").trim();
+                let val = "void";
                 if (retExpr) {
-                    const val = evaluateExpression(retExpr, variables, arrays);
-                    output.push(`Return: ${val}`);
+                    val = evaluateExpression(retExpr, variables, arrays);
+                    const displayVal = (typeof val === "object") ? JSON.stringify(val) : val;
+                    output.push(`Return: ${displayVal}`);
                     addStep(lineIdx + 1);
                 }
+                throw { type: "RETURN_SIGNAL", value: val };
             } catch (e) {
+                if (e.type === "RETURN_SIGNAL") throw e;
                 console.warn(`[VISUALIZER] Return eval failed line ${lineIdx + 1}: ${e.message}`);
             }
-            return rawLines.length; // stop execution after return
+            return rawLines.length;
         }
 
         if (shouldSkipLine(raw)) return lineIdx + 1;
@@ -751,12 +864,14 @@ function interpret(code, language) {
             if (++iterations > MAX_LOOP_ITERATIONS) {
                 throw new Error("Visualization stopped: possible infinite loop.");
             }
+
             let bodyIdx = bodyStart;
             while (bodyIdx <= bodyEnd) {
                 const bodyRaw = rawLines[bodyIdx]?.trim();
                 if (!bodyRaw || bodyRaw === "{" || bodyRaw === "}") { bodyIdx++; continue; }
                 bodyIdx = executeLine(bodyIdx);
             }
+
             const updateCleaned = cleanLine(header.updateLine);
             if (isIncrementDecrement(updateCleaned)) {
                 const r = executeIncrementDecrement(updateCleaned, variables);
@@ -786,6 +901,7 @@ function interpret(code, language) {
             if (++iterations > MAX_LOOP_ITERATIONS) {
                 throw new Error("Visualization stopped: possible infinite loop.");
             }
+
             let bodyIdx = bodyStart;
             while (bodyIdx <= bodyEnd) {
                 const bodyRaw = rawLines[bodyIdx]?.trim();
@@ -818,9 +934,11 @@ function interpret(code, language) {
                         if (!bodyRaw || bodyRaw === "{" || bodyRaw === "}") { bodyIdx++; continue; }
                         bodyIdx = executeLine(bodyIdx);
                     }
+
                     idx = blockEnd + 1;
+                    // Skip remaining else-ifs/else
                     while (idx < rawLines.length) {
-                        const nextCleaned = cleanLine(rawLines[idx].trim());
+                        const nextCleaned = cleanLine(rawLines[idx]?.trim() || "");
                         if (isElseIf(nextCleaned) || isElse(nextCleaned)) {
                             idx = findBlockEnd(rawLines, idx) + 1;
                         } else break;
@@ -847,10 +965,19 @@ function interpret(code, language) {
     }
 
     // --- Start execution ---
-    let lineIdx = 0;
-    while (lineIdx < rawLines.length) {
-        lineIdx = executeLine(lineIdx);
+    try {
+        let lineIdx = 0;
+        while (lineIdx < rawLines.length) {
+            lineIdx = executeLine(lineIdx);
+        }
+    } catch (e) {
+        if (e.type === "RETURN_SIGNAL") {
+            // Execution stopped by return
+        } else {
+            throw e;
+        }
     }
+
     return steps;
 }
 
