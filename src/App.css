@@ -1557,8 +1557,9 @@ body {
 
 /* Code section - top */
 .detail-code-section {
-  flex: 1;
-  min-height: 200px;
+  flex: 0 0 auto;
+  max-height: 60vh;
+  min-height: 100px;
   display: flex;
   flex-direction: column;
   background-color: var(--code-bg);
