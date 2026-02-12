@@ -1,9 +1,10 @@
 // ==========================================
-// DASHBOARD COMPONENT (Day 4 - Dark Dashboard)
+// DASHBOARD COMPONENT (Day 7 - Productization)
 // ==========================================
 // Main dashboard with:
 //   - Sidebar navigation
 //   - TopBar with search
+//   - Section-based content switching
 //   - 3-pane layout: list | detail | form
 // ==========================================
 
@@ -16,6 +17,8 @@ import TopBar from "./TopBar";
 import SnippetForm from "./SnippetForm";
 import SnippetList from "./SnippetList";
 import SnippetDetail from "./SnippetDetail";
+import AIInsights from "./AIInsights";
+import Settings from "./Settings";
 
 function Dashboard() {
     const { user, logout } = useAuth();
@@ -37,9 +40,35 @@ function Dashboard() {
     const [searchTerm, setSearchTerm] = useState("");
     const [filterDate, setFilterDate] = useState("");
 
-    // Sidebar state
+    // Sidebar state & URL sync
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [activeSection, setActiveSection] = useState("dashboard");
+
+    // Initialize section from URL
+    const [activeSection, setActiveSection] = useState(() => {
+        const path = window.location.pathname.slice(1); // remove leading slash
+        if (path === "ai-insights") return "insights";
+        if (["dashboard", "snippets", "settings"].includes(path)) return path;
+        return "dashboard";
+    });
+
+    // Sync state to URL when changed (pushed)
+    function handleSectionChange(section) {
+        setActiveSection(section);
+        const path = section === "insights" ? "ai-insights" : section;
+        window.history.pushState(null, "", `/${path}`);
+    }
+
+    // Handle back button (popstate)
+    useEffect(() => {
+        const handlePopState = () => {
+            const path = window.location.pathname.slice(1);
+            if (path === "ai-insights") setActiveSection("insights");
+            else if (["dashboard", "snippets", "settings"].includes(path)) setActiveSection(path);
+            else setActiveSection("dashboard");
+        };
+        window.addEventListener("popstate", handlePopState);
+        return () => window.removeEventListener("popstate", handlePopState);
+    }, []);
 
     // Load snippets on mount
     useEffect(() => {
@@ -237,12 +266,70 @@ function Dashboard() {
         setSidebarOpen(!sidebarOpen);
     }
 
+    // Determine if we should show snippet UI (search bar etc)
+    const isSnippetView = activeSection === "dashboard" || activeSection === "snippets";
+
+    // Render section content
+    function renderContent() {
+        switch (activeSection) {
+            case "insights":
+                return (
+                    <main className="section-content">
+                        <AIInsights snippets={snippets} />
+                    </main>
+                );
+            case "settings":
+                return (
+                    <main className="section-content">
+                        <Settings user={user} onLogout={logout} />
+                    </main>
+                );
+            case "dashboard":
+            case "snippets":
+            default:
+                return (
+                    <main className="dashboard-content">
+                        {/* Left pane - Snippet list */}
+                        <section className="pane pane-list">
+                            <div className="pane-header">
+                                <h2>{activeSection === "dashboard" ? "Your Snippets" : "Snippets"}</h2>
+                                <span className="snippet-count">{filteredSnippets.length}</span>
+                            </div>
+                            {filterDate && (
+                                <p className="filter-hint-dark">Filtering: {filterDate}</p>
+                            )}
+                            <SnippetList
+                                snippets={filteredSnippets}
+                                selectedId={selectedSnippet?.id}
+                                onSelect={handleSelectSnippet}
+                                loading={loading}
+                            />
+                        </section>
+
+                        {/* Center pane - Snippet detail */}
+                        <section className="pane pane-detail">
+                            <SnippetDetail
+                                snippet={selectedSnippet}
+                                notesStatus={selectedSnippet ? (notesStatus[selectedSnippet.id] || "idle") : "idle"}
+                                onRetryNotes={handleRetryNotes}
+                            />
+                        </section>
+
+                        {/* Right pane - Snippet form */}
+                        <section className="pane pane-form">
+                            <SnippetForm onSave={handleSaveSnippet} saving={saving} />
+                        </section>
+                    </main>
+                );
+        }
+    }
+
     return (
         <div className="app-layout">
             {/* Sidebar */}
             <Sidebar
                 activeSection={activeSection}
-                onSectionChange={setActiveSection}
+                onSectionChange={handleSectionChange}
                 isOpen={sidebarOpen}
                 onToggle={toggleSidebar}
             />
@@ -253,46 +340,15 @@ function Dashboard() {
                 <TopBar
                     user={user}
                     onLogout={logout}
-                    searchTerm={searchTerm}
-                    onSearchChange={setSearchTerm}
-                    filterDate={filterDate}
-                    onFilterDateChange={setFilterDate}
+                    searchTerm={isSnippetView ? searchTerm : ""}
+                    onSearchChange={isSnippetView ? setSearchTerm : undefined}
+                    filterDate={isSnippetView ? filterDate : ""}
+                    onFilterDateChange={isSnippetView ? setFilterDate : undefined}
                     onMenuToggle={toggleSidebar}
+                    hideSearch={!isSnippetView}
                 />
 
-                {/* Dashboard content - 3 pane layout */}
-                <main className="dashboard-content">
-                    {/* Left pane - Snippet list */}
-                    <section className="pane pane-list">
-                        <div className="pane-header">
-                            <h2>Snippets</h2>
-                            <span className="snippet-count">{filteredSnippets.length}</span>
-                        </div>
-                        {filterDate && (
-                            <p className="filter-hint-dark">Filtering: {filterDate}</p>
-                        )}
-                        <SnippetList
-                            snippets={filteredSnippets}
-                            selectedId={selectedSnippet?.id}
-                            onSelect={handleSelectSnippet}
-                            loading={loading}
-                        />
-                    </section>
-
-                    {/* Center pane - Snippet detail */}
-                    <section className="pane pane-detail">
-                        <SnippetDetail
-                            snippet={selectedSnippet}
-                            notesStatus={selectedSnippet ? (notesStatus[selectedSnippet.id] || "idle") : "idle"}
-                            onRetryNotes={handleRetryNotes}
-                        />
-                    </section>
-
-                    {/* Right pane - Snippet form */}
-                    <section className="pane pane-form">
-                        <SnippetForm onSave={handleSaveSnippet} saving={saving} />
-                    </section>
-                </main>
+                {renderContent()}
             </div>
         </div>
     );

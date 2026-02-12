@@ -54,12 +54,12 @@ function Home({ onGetStarted, onLogin }) {
                         <br />
                         <span className="hero-highlight">Recall it instantly.</span>
                         <br />
-                        Learn from it automatically.
+                        Understand it with AI. Visualize it step by step.
                     </h1>
                     <p className="hero-subtitle">
-                        Code Recall helps students store code snippets and generate
-                        structured revision notes using AI. Perfect for DSA practice,
-                        competitive programming, and interview prep.
+                        CodeRecall helps developers store code snippets, generate
+                        AI-powered revision notes, and visualize execution step by step.
+                        Built for DSA practice, competitive programming, and interview prep.
                     </p>
                     <div className="hero-buttons">
                         <button onClick={onGetStarted} className="btn-hero-primary">

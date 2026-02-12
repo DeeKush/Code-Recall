@@ -18,7 +18,8 @@ function TopBar({
     onSearchChange,
     filterDate,
     onFilterDateChange,
-    onMenuToggle
+    onMenuToggle,
+    hideSearch = false
 }) {
     // Local state for debounced search
     const [localSearch, setLocalSearch] = useState(searchTerm);
@@ -29,6 +30,7 @@ function TopBar({
     }, [searchTerm]);
 
     useEffect(() => {
+        if (hideSearch || !onSearchChange) return;
         const timer = setTimeout(() => {
             // Only call parent if value changed
             if (localSearch !== searchTerm) {
@@ -37,7 +39,7 @@ function TopBar({
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [localSearch, searchTerm, onSearchChange]);
+    }, [localSearch, searchTerm, onSearchChange, hideSearch]);
 
     return (
         <header className="topbar">
@@ -45,39 +47,43 @@ function TopBar({
             <div className="topbar-left">
                 <MobileMenuButton onClick={onMenuToggle} />
 
-                <div className="topbar-search">
-                    <Search size={18} className="search-icon" />
-                    <input
-                        type="text"
-                        placeholder="Search snippets..."
-                        value={localSearch}
-                        onChange={(e) => setLocalSearch(e.target.value)}
-                        className="search-input-dark"
-                    />
-                </div>
+                {!hideSearch && (
+                    <div className="topbar-search">
+                        <Search size={18} className="search-icon" />
+                        <input
+                            type="text"
+                            placeholder="Search snippets..."
+                            value={localSearch}
+                            onChange={(e) => setLocalSearch(e.target.value)}
+                            className="search-input-dark"
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Center/Right section - Date filter + User */}
             <div className="topbar-right">
                 {/* Date filter */}
-                <div className="topbar-date-filter">
-                    <Calendar size={16} className="date-icon" />
-                    <input
-                        type="date"
-                        value={filterDate}
-                        onChange={(e) => onFilterDateChange(e.target.value)}
-                        className="date-input-dark"
-                    />
-                    {filterDate && (
-                        <button
-                            onClick={() => onFilterDateChange("")}
-                            className="date-clear"
-                            title="Clear date filter"
-                        >
-                            <X size={14} />
-                        </button>
-                    )}
-                </div>
+                {!hideSearch && onFilterDateChange && (
+                    <div className="topbar-date-filter">
+                        <Calendar size={16} className="date-icon" />
+                        <input
+                            type="date"
+                            value={filterDate}
+                            onChange={(e) => onFilterDateChange(e.target.value)}
+                            className="date-input-dark"
+                        />
+                        {filterDate && (
+                            <button
+                                onClick={() => onFilterDateChange("")}
+                                className="date-clear"
+                                title="Clear date filter"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {/* User section */}
                 <div className="topbar-user">

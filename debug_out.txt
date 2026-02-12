@@ -1,0 +1,41 @@
+Running visualization for Two Sum...
+DEBUG: eval "0" [ 'twoSum', 'nums' ] [ [], [] ]
+DEBUG: eval "i < nums.length" [ 'i', 'twoSum', 'nums' ] [ 0, [], [] ]
+DEBUG: evaluateCondition "i < nums.length" -> false
+DEBUG: eval "[]" [ 'i', 'twoSum', 'nums' ] [ 0, [], [] ]
+Steps generated: 2
+
+--- Direct Evaluation Test ---
+node : Error: 
+ReferenceError: require is 
+not defined
+At line:1 char:1
++ node reproduce_twosum.js 
+2>&1 | Out-File -Encoding 
+ascii debug_out.tx ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~
+    + CategoryInfo         
+     : NotSpecified: (Err  
+  or: Referenc... is not   
+  defined:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+    at file:///C:/Users/Len
+ovo/Downloads/VSCode/Deepak
+%20Projects/Code%20Recall/C
+ode-Recall/reproduce_twosum
+.js:32:36
+    at ModuleJob.run (node:
+internal/modules/esm/module
+_job:329:25)
+    at async onImport.trace
+Promise.__proto__ (node:int
+ernal/modules/esm/loader:64
+4:26)
+    at async asyncRunEntryP
+ointWithESMLoader (node:int
+ernal/modules/run_main:117:
+5)

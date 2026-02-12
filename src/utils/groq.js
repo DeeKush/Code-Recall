@@ -231,3 +231,89 @@ export async function generateVisualizerInputs(code, language = "java") {
         return null;
     }
 }
+
+/**
+ * 4. Ask a question about a snippet (Day 7 - AI Insights Chat)
+ * Returns: plain text answer (not JSON)
+ */
+export async function askSnippetQuestion(snippet, question) {
+    if (GROQ_KEYS.length === 0 && !OPENROUTER_KEY) {
+        throw new Error("No API keys configured.");
+    }
+
+    const context = [
+        `Title: ${snippet.title || "Untitled"}`,
+        `Topic: ${snippet.topic || "Unknown"}`,
+        `Code:\n${(snippet.code || "").slice(0, 2000)}`,
+        snippet.aiNotes ? `AI Notes:\n${JSON.stringify(snippet.aiNotes, null, 2).slice(0, 1000)}` : ""
+    ].filter(Boolean).join("\n\n");
+
+    const systemPrompt = `You are a competitive programming tutor and code mentor.
+You help students understand code, verify approaches, explain logic, identify edge cases, and suggest optimizations.
+Be concise but thorough. Use examples when helpful. Format with markdown.`;
+
+    const userPrompt = `Here is the snippet context:\n\n${context}\n\nStudent question: ${question}`;
+
+    // For chat we need plain text, not JSON — call Groq directly
+    const errors = [];
+
+    for (let i = 0; i < GROQ_KEYS.length; i++) {
+        try {
+            const res = await Promise.race([
+                fetch(GROQ_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${GROQ_KEYS[i]}`
+                    },
+                    body: JSON.stringify({
+                        model: GROQ_MODEL,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userPrompt }
+                        ],
+                        temperature: 0.7
+                    })
+                }),
+                timeout(TIMEOUT_MS)
+            ]);
+            if (!res.ok) throw new Error(`Groq ${res.status}`);
+            const data = await res.json();
+            return data.choices[0]?.message?.content || "No response.";
+        } catch (err) {
+            errors.push(err.message);
+        }
+    }
+
+    if (OPENROUTER_KEY) {
+        try {
+            const res = await Promise.race([
+                fetch(OPENROUTER_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${OPENROUTER_KEY}`,
+                        "HTTP-Referer": window.location.origin,
+                        "X-Title": "Code Recall"
+                    },
+                    body: JSON.stringify({
+                        model: OPENROUTER_MODEL,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userPrompt }
+                        ],
+                        temperature: 0.7
+                    })
+                }),
+                timeout(TIMEOUT_MS)
+            ]);
+            if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
+            const data = await res.json();
+            return data.choices[0]?.message?.content || "No response.";
+        } catch (err) {
+            errors.push(err.message);
+        }
+    }
+
+    throw new Error(`All AI providers failed.\n${errors.join("\n")}`);
+}
