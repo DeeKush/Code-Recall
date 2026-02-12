@@ -7,7 +7,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Sparkles, BookOpen, ChevronDown, ChevronRight, Info, Eye, EyeOff, CheckCircle, RotateCcw, Lock, Trophy, Clock, AlertCircle } from "lucide-react";
+import { Sparkles, BookOpen, ChevronDown, ChevronRight, Info, Eye, EyeOff, CheckCircle, RotateCcw, Lock, Trophy, Clock, AlertCircle, Zap, Target, AlertTriangle, Monitor, HardDrive } from "lucide-react";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { updateSnippetRecall } from "../utils/storage";
@@ -45,13 +45,15 @@ function RecallQueueCard({ snippet, isActive, onClick }) {
 }
 
 // Local Component: Accordion for AI Notes
-function NoteAccordion({ title, content, icon: Icon, defaultOpen = true }) {
+// Uses .ai-note-block for styling
+function NoteAccordion({ title, content, icon: Icon, defaultOpen = false }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
+    // If content is missing, don't render
     if (!content) return null;
 
     return (
-        <div className={`note-accordion section-gap-sm`}>
+        <div className={`note-accordion ai-note-block`}>
             <button
                 className={`accordion-header ${isOpen ? "open" : ""}`}
                 onClick={() => setIsOpen(!isOpen)}
@@ -107,51 +109,86 @@ function RecallMode({ snippets = [], onNavigate }) {
     useEffect(() => {
         if (!snippets || snippets.length === 0) return;
 
-        console.log("[RECALL] Building V2 Queue...");
+        console.log("[RECALL] Building Custom Selection Queue...");
         const now = new Date();
         const todayStr = now.toDateString();
 
-        // Step A: Filter Eligible Snippets
-        const eligible = snippets.filter(s => {
-            // Rule 1: Must have AI Notes if possible
-            if (!s.aiNotes) return false;
+        // Calculate "Yesterday" string for exclusion
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toDateString();
 
-            // Rule 2: Session Boundary
-            if (s.lastRecalledAt?.seconds) {
-                const lastDate = new Date(s.lastRecalledAt.seconds * 1000);
-                if (lastDate.toDateString() === todayStr) {
-                    return false;
-                }
-            }
-            return true;
+        // 1. Exclude revised yesterday or today
+        const eligible = snippets.filter(s => {
+            if (!s.lastRecalledAt?.seconds) return true; // Never recalled = Eligible
+
+            const lastDate = new Date(s.lastRecalledAt.seconds * 1000);
+            const lastDateStr = lastDate.toDateString();
+
+            return lastDateStr !== todayStr && lastDateStr !== yesterdayStr;
         });
 
-        // Step B: Scoring & Sorting
+        // 2. Prioritize (Calculate Scores)
         const scored = eligible.map(s => {
-            let daysSince = 0;
+            // A. Hard/Confusing (Revisit) -> Highest Priority
+            const isHard = s.lastFeedback === 'revisit';
+
+            // B. Lowest Score/Streak (Lower is better for recall needs)
+            // If streak is high, priority is low. 
+            const streak = s.recallStreak || 0;
+
+            // C. Oldest (Spaced Repetition) -> Higher priority
+            let daysSince = 100; // Default for new
             if (s.lastRecalledAt?.seconds) {
                 const lastDate = new Date(s.lastRecalledAt.seconds * 1000);
                 const diffTime = Math.abs(now - lastDate);
                 daysSince = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            } else {
-                daysSince = 100; // New snippets high priority
             }
 
-            const revisit = s.revisitCount || 0;
-            const understood = s.understoodCount || 0;
+            // D. Medium Length Bonus (Tie-breaker)
+            // Very short (< 50) or very long (> 2000) get 0 bonus. Medium gets +1.
+            const len = s.code ? s.code.length : 0;
+            const isMediumLength = len > 50 && len < 2000;
 
-            const score = (daysSince * 2) + (revisit * 3) - (understood * 1);
-            return { ...s, priorityScore: score };
+            // COMPOSITE SCORE (Higher = Pick first)
+            // 1. Hard: +10000
+            // 2. Low Streak: + (100 - streak) * 10  (Assuming max streak ~100)
+            // 3. Days Since: + daysSince * 5
+            // 4. Medium Length: + 1
+
+            let priority = 0;
+            if (isHard) priority += 10000;
+            priority += (100 - Math.min(streak, 100)) * 10;
+            priority += daysSince * 5;
+            if (isMediumLength) priority += 1;
+
+            return { ...s, selectionPriority: priority };
         });
 
-        scored.sort((a, b) => b.priorityScore - a.priorityScore);
+        // Sort by Priority Descending
+        scored.sort((a, b) => b.selectionPriority - a.selectionPriority);
 
-        const sessionQueue = scored.slice(0, 20);
-        console.log(`[RECALL] Queue built: ${sessionQueue.length} items.`);
-        setRecallQueue(sessionQueue);
+        // 3. Select 7 with Diversity (Max 2 per topic)
+        const selected = [];
+        const topicCounts = {};
 
-        if (sessionQueue.length > 0) {
-            setSelectedId(sessionQueue[0].id);
+        for (const snippet of scored) {
+            if (selected.length >= 7) break; // Stop at 7
+
+            const topic = snippet.topic || "Unknown";
+            const currentCount = topicCounts[topic] || 0;
+
+            if (currentCount < 2) {
+                selected.push(snippet);
+                topicCounts[topic] = currentCount + 1;
+            }
+        }
+
+        console.log(`[RECALL] Selected ${selected.length} snippets for session.`);
+        setRecallQueue(selected);
+
+        if (selected.length > 0) {
+            setSelectedId(selected[0].id);
         }
 
     }, [snippets]);
@@ -196,7 +233,21 @@ function RecallMode({ snippets = [], onNavigate }) {
     };
 
     // -------------------------------------------
-    // 3. RENDER: COMPLETION VIEW
+    // 3. HELPER: Note Sections Configuration
+    // -------------------------------------------
+    // Specifically requested order:
+    // Problem, Intuition, Approach, Time Complexity, Space Complexity, Edge Cases
+    const NOTE_SECTIONS = [
+        { key: "problem", title: "Problem Statement", icon: AlertCircle, defaultOpen: true },
+        { key: "intuition", title: "Intuition", icon: Zap, defaultOpen: true },
+        { key: "approach", title: "Approach", icon: Target, defaultOpen: true },
+        { key: "timeComplexity", title: "Time Complexity", icon: Clock },
+        { key: "spaceComplexity", title: "Space Complexity", icon: HardDrive },
+        { key: "edgeCases", title: "Edge Cases", icon: AlertTriangle }
+    ];
+
+    // -------------------------------------------
+    // 4. RENDER: COMPLETION VIEW
     // -------------------------------------------
     if (recallQueue.length === 0) {
         if (snippets.length === 0) {
@@ -236,12 +287,16 @@ function RecallMode({ snippets = [], onNavigate }) {
         );
     }
 
-    // CHECK FOR NOTES
-    const hasNotes = currentSnippet && currentSnippet.aiNotes &&
-        (currentSnippet.aiNotes.explanation || currentSnippet.aiNotes.useCases);
+    // CHECK FOR NOTES EXISTENCE
+    const hasNotes = currentSnippet && currentSnippet.aiNotes && (
+        currentSnippet.aiNotes.problem ||
+        currentSnippet.aiNotes.intuition ||
+        currentSnippet.aiNotes.approach ||
+        currentSnippet.aiNotes.explanation // Legacy support
+    );
 
     // -------------------------------------------
-    // 4. RENDER: MAIN LAYOUT
+    // 5. RENDER: MAIN LAYOUT
     // -------------------------------------------
     return (
         <div className="recall-page">
@@ -288,23 +343,32 @@ function RecallMode({ snippets = [], onNavigate }) {
                             </div>
                         </div>
 
-                        {/* Content: AI Notes (Always Visible) */}
+                        {/* Content: AI Notes (Strict Order) */}
                         <div className="recall-notes-section">
                             {hasNotes ? (
                                 <>
-                                    {currentSnippet.aiNotes.explanation && (
+                                    {NOTE_SECTIONS.map(section => {
+                                        const content = currentSnippet.aiNotes[section.key];
+                                        if (content) {
+                                            return (
+                                                <NoteAccordion
+                                                    key={section.key}
+                                                    title={section.title}
+                                                    content={content}
+                                                    icon={section.icon}
+                                                    defaultOpen={section.defaultOpen}
+                                                />
+                                            );
+                                        }
+                                        return null;
+                                    })}
+
+                                    {/* Legacy Fallback: If no problem/intuition but has explanation */}
+                                    {!currentSnippet.aiNotes.problem && currentSnippet.aiNotes.explanation && (
                                         <NoteAccordion
                                             title="Explanation"
                                             content={currentSnippet.aiNotes.explanation}
                                             icon={BookOpen}
-                                            defaultOpen={true}
-                                        />
-                                    )}
-                                    {currentSnippet.aiNotes.useCases && (
-                                        <NoteAccordion
-                                            title="Use Cases"
-                                            content={currentSnippet.aiNotes.useCases}
-                                            icon={Info}
                                             defaultOpen={true}
                                         />
                                     )}

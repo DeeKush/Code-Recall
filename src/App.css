@@ -5106,3 +5106,65 @@ textarea:focus-visible,
     overflow: visible;
   }
 }
+
+/* AI Note Blocks (Day 8 Refinement) */
+.ai-note-block {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0;
+  /* Padding handled by internal children for accordion */
+  margin-bottom: 0.75rem;
+  /* Compact vertical spacing */
+  overflow: hidden;
+  /* For radius */
+  transition: border-color var(--transition-fast);
+}
+
+.ai-note-block:hover {
+  border-color: var(--border-light);
+}
+
+.ai-note-block .accordion-header {
+  padding: 12px 16px;
+  background: transparent;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  /* Slightly smaller than H1 */
+  font-weight: 600;
+  /* Slightly bolder */
+  cursor: pointer;
+  outline: none;
+}
+
+.ai-note-block .accordion-header .accordion-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-note-block .accordion-content {
+  padding: 0 16px 16px 16px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  border-top: 1px solid transparent;
+  /* Hidden by default */
+}
+
+/* If expanded, maybe show a subtle separator? User didn't ask, but standard accordion practice. */
+.ai-note-block .accordion-header.open {
+  /* border-bottom: 1px solid var(--border-color); optional */
+  padding-bottom: 8px;
+  /* Adjust if content immediately follows */
+}
+
+.ai-note-block .accordion-header.open+.accordion-content {
+  border-top: none;
+  padding-top: 4px;
+}
