@@ -15,15 +15,17 @@ import {
     Settings,
     Menu,
     X,
-    Brain
+    Brain,
+    Home
 } from "lucide-react";
 
 function Sidebar({ activeSection = "dashboard", onSectionChange, isOpen, onToggle }) {
     // Navigation items configuration
     const navItems = [
-        { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { id: "snippets", label: "Snippets", icon: Code2 },
-        { id: "insights", label: "AI Insights", icon: Sparkles },
+        { id: "home", label: "Create Snippet", icon: Home },
+        { id: "snippets", label: "My Snippets", icon: Code2 },
+        { id: "recall", label: "Recall Mode", icon: Sparkles },
+        { id: "dashboard", label: "Analytics", icon: LayoutDashboard },
         { id: "settings", label: "Settings", icon: Settings }
     ];
 

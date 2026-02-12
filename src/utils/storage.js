@@ -14,7 +14,11 @@ import {
     orderBy,
     Timestamp,
     doc,
-    updateDoc
+    updateDoc,
+    deleteDoc,
+    getDoc,
+    increment,
+    serverTimestamp
 } from "firebase/firestore";
 
 /**
@@ -180,6 +184,87 @@ export async function updateSnippetAI(userId, snippetId, aiData, status) {
         return updateData;
     } catch (error) {
         console.error("[ERROR] Failed to update snippet with AI data:", error);
+        throw error;
+    }
+}
+
+/**
+ * Update a snippet's user-editable fields
+ * @param {string} userId
+ * @param {string} snippetId
+ * @param {Object} data - { title, topic, tags, code }
+ */
+export async function updateSnippet(userId, snippetId, data) {
+    try {
+        const snippetRef = doc(db, "users", userId, "snippets", snippetId);
+        await updateDoc(snippetRef, {
+            ...data,
+            updatedAt: Timestamp.now()
+        });
+        return { id: snippetId, ...data };
+    } catch (error) {
+        console.error("Error updating snippet:", error);
+        throw error;
+    }
+}
+
+/**
+ * Delete a snippet
+ * @param {string} userId
+ * @param {string} snippetId
+ */
+export async function deleteSnippet(userId, snippetId) {
+    try {
+        const snippetRef = doc(db, "users", userId, "snippets", snippetId);
+        await deleteDoc(snippetRef);
+        return snippetId;
+    } catch (error) {
+        console.error("Error deleting snippet:", error);
+        throw error;
+    }
+}
+
+/**
+ * Update snippet recall stats (Spaced Repetition V2)
+ * @param {string} userId
+ * @param {string} snippetId
+ * @param {boolean} isUnderstood - True = "I understood", False = "Revisit later"
+ */
+export async function updateSnippetRecall(userId, snippetId, isUnderstood) {
+    if (!userId || !snippetId) return;
+    const snippetRef = doc(db, "users", userId, "snippets", snippetId);
+
+    try {
+        // 1. Read current stats for streak calculation
+        const snap = await getDoc(snippetRef);
+        if (!snap.exists()) return;
+
+        const currentData = snap.data();
+        const currentStreak = currentData.recallStreak || 0;
+
+        // 2. Calculate new values
+        const newStreak = isUnderstood ? currentStreak + 1 : 0;
+        const feedbackType = isUnderstood ? "understood" : "revisit";
+
+        const updatePayload = {
+            lastRecalledAt: serverTimestamp(),
+            lastFeedback: feedbackType,
+            recallStreak: newStreak,
+            recallCount: increment(1)
+        };
+
+        if (isUnderstood) {
+            updatePayload.understoodCount = increment(1);
+        } else {
+            updatePayload.revisitCount = increment(1);
+        }
+
+        // 3. Update
+        await updateDoc(snippetRef, updatePayload);
+        console.log(`[RECALL] Updated snippet ${snippetId}: ${feedbackType} (Streak: ${newStreak})`);
+
+    } catch (error) {
+        console.error("Error updating recall stats:", error);
         throw error;
     }
 }

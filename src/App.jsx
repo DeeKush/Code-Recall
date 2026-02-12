@@ -7,9 +7,9 @@
 //   - Dashboard
 // ==========================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import Home from "./components/Home";
+import Landing from "./components/Landing";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import Dashboard from "./components/Dashboard";
@@ -22,15 +22,23 @@ function AppContent() {
   const { user, loading } = useAuth();
 
   // State for navigation
-  const [currentPage, setCurrentPage] = useState("home"); // home, login, signup
+  const [currentPage, setCurrentPage] = useState("landing"); // landing, login, signup
 
-  // Auth Protection: Redirect to login if accessing protected route while unlogged
+  // Auth Protection & Direct URL Handling
   useEffect(() => {
     const path = window.location.pathname;
-    if (["/dashboard", "/snippets", "/ai-insights", "/settings"].includes(path)) {
-      setCurrentPage("login");
+
+    // If not logged in and trying to access protected route -> redirect to login (or landing)
+    // Protected routes: /dashboard, /snippets, /recall, /home, /settings
+    // Public routes: /, /login, /signup
+    const isProtected = ["/dashboard", "/snippets", "/recall", "/home", "/settings"].some(p => path.startsWith(p));
+
+    if (!loading && !user && isProtected) {
+      // Force to landing or login
+      window.history.replaceState(null, "", "/");
+      setCurrentPage("landing");
     }
-  }, []);
+  }, [user, loading]);
 
   // Show loading screen while checking auth status
   if (loading) {
@@ -43,29 +51,30 @@ function AppContent() {
   }
 
   // If user is logged in, show the Dashboard
+  // Dashboard handles its own internal routing (home, snippets, recall, etc.)
   if (user) {
     return <Dashboard />;
   }
 
-  // Show appropriate page based on state
+  // Show appropriate public page based on state
   switch (currentPage) {
     case "login":
       return (
         <Login
           onSwitchToSignup={() => setCurrentPage("signup")}
-          onBackToHome={() => setCurrentPage("home")}
+          onBackToHome={() => setCurrentPage("landing")}
         />
       );
     case "signup":
       return (
         <Signup
           onSwitchToLogin={() => setCurrentPage("login")}
-          onBackToHome={() => setCurrentPage("home")}
+          onBackToHome={() => setCurrentPage("landing")}
         />
       );
     default:
       return (
-        <Home
+        <Landing
           onGetStarted={() => setCurrentPage("signup")}
           onLogin={() => setCurrentPage("login")}
         />

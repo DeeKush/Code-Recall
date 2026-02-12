@@ -1,31 +1,38 @@
 // ==========================================
-// SNIPPET FORM COMPONENT (Day 4 - Dark Theme)
+// SNIPPET FORM COMPONENT (Refactored for Dashboard Home)
 // ==========================================
-// Two-step flow with dark UI:
-//   1. User pastes code, clicks "Generate Details"
-//   2. AI generates metadata (with loading skeleton)
-//   3. Preview appears - user reviews/edits
-//   4. User clicks "Confirm Save" to save
+// Controlled component.
+// Props:
+//  - code, title, topic, tags (values)
+//  - onChange (function to update parent state)
+//  - onSave (function to trigger save)
+//  - saving (boolean)
 // ==========================================
 
 import { useState } from "react";
-import { Code, Sparkles, FileText, Tag, Loader, Check, X, Plus } from "lucide-react";
+import { Code, Sparkles, FileText, Tag, Loader, Check, X, Plus, AlertCircle } from "lucide-react";
 import { generateSnippetMetadata } from "../utils/groq";
 
-function SnippetForm({ onSave, saving }) {
-    // Form state
-    const [code, setCode] = useState("");
-
-    // Review panel state (shown after AI generates metadata)
-    const [showReview, setShowReview] = useState(false);
+function SnippetForm({
+    code,
+    title,
+    topic,
+    tags,
+    onChange,
+    onSave,
+    saving
+}) {
+    // Internal UI state
     const [analyzing, setAnalyzing] = useState(false);
-
-    // Editable metadata fields
-    const [title, setTitle] = useState("");
-    const [topic, setTopic] = useState("");
+    const [showReview, setShowReview] = useState(false);
     const [tagsInput, setTagsInput] = useState("");
 
-    // Step 1: Analyze code and show review panel
+    // Helper to update specific field
+    const updateField = (field, value) => {
+        onChange({ [field]: value });
+    };
+
+    // Analyze Code
     async function handleAnalyze(e) {
         e.preventDefault();
 
@@ -43,68 +50,61 @@ function SnippetForm({ onSave, saving }) {
 
         try {
             const metadata = await generateSnippetMetadata(code);
-            setTitle(metadata.title || "");
-            setTopic(metadata.topic || "");
-            setTagsInput((metadata.aiTags || []).join(", "));
+
+            // Batch update parent state
+            onChange({
+                title: metadata.title || "",
+                topic: metadata.topic || "",
+                tags: metadata.aiTags || []
+            });
+
+            // Reset local tags input since tags are now in parent state
+            setTagsInput("");
             setShowReview(true);
         } catch (error) {
             console.error("Analysis failed:", error);
             // Fallback: let user fill in details manually
-            setTitle("");
-            setTopic("");
-            setTagsInput("");
+            onChange({
+                title: "",
+                topic: "",
+                tags: []
+            });
             setShowReview(true);
         } finally {
             setAnalyzing(false);
         }
     }
 
-    // Step 2: Save the snippet with reviewed metadata
-    function handleSave() {
-        const tagsArray = tagsInput
-            .split(",")
-            .map(tag => tag.trim())
-            .filter(tag => tag.length > 0);
-
-        onSave({
-            code: code.trim(),
-            title: title.trim(),
-            topic: topic.trim(),
-            tags: tagsArray
-        });
-
-        // Reset form
-        setCode("");
-        setTitle("");
-        setTopic("");
+    // Add Tag
+    const handleAddTag = () => {
+        if (!tagsInput.trim()) return;
+        const newTag = tagsInput.trim();
+        if (!tags.includes(newTag)) {
+            updateField("tags", [...tags, newTag]);
+        }
         setTagsInput("");
-        setShowReview(false);
-    }
+    };
 
-    // Cancel review
-    function handleCancel() {
+    // Remove Tag
+    const handleRemoveTag = (tagToRemove) => {
+        updateField("tags", tags.filter(t => t !== tagToRemove));
+    };
+
+    // Confirm Save
+    const handleConfirmSave = () => {
+        onSave(); // Parent handles the actual object construction and saving
+        // Reset internal UI state
         setShowReview(false);
-        setTitle("");
-        setTopic("");
         setTagsInput("");
-    }
+    };
 
-    // Remove a tag
-    function handleRemoveTag(tagToRemove) {
-        const currentTags = tagsInput
-            .split(",")
-            .map(t => t.trim())
-            .filter(t => t.length > 0 && t !== tagToRemove);
-        setTagsInput(currentTags.join(", "));
-    }
+    const handleCancel = () => {
+        setShowReview(false);
+        // We do NOT clear the form data here, allowing user to edit code again if they want
+        // If we want to clear, parent should handle it on "Cancel" or we just hide review
+    };
 
-    // Parse tags for display
-    const parsedTags = tagsInput
-        .split(",")
-        .map(t => t.trim())
-        .filter(t => t.length > 0);
-
-    const canSave = showReview && !saving && title.trim() && topic.trim();
+    const isFormValid = title.trim() && topic.trim();
 
     return (
         <div className="snippet-form-dark">
@@ -113,27 +113,28 @@ function SnippetForm({ onSave, saving }) {
                 <h3>New Snippet</h3>
             </div>
 
-            {/* Code input section */}
-            <div className="form-section-dark">
-                <label className="form-label-dark">
-                    <Code size={16} />
+            {/* Code Input */}
+            <div className="section-gap">
+                <label className="std-label">
+                    <Code size={14} />
                     <span>Code</span>
                 </label>
                 <textarea
                     value={code}
-                    onChange={(e) => setCode(e.target.value)}
+                    onChange={(e) => updateField("code", e.target.value)}
                     placeholder="Paste your code here..."
-                    rows={10}
+                    rows={12}
                     disabled={analyzing || showReview}
-                    className="form-textarea-dark"
+                    className="std-textarea code-font"
+                    spellCheck="false"
                 />
 
-                {/* Generate button */}
                 {!showReview && (
                     <button
                         onClick={handleAnalyze}
                         disabled={analyzing || !code.trim()}
-                        className="btn-generate-dark"
+                        className="std-btn-primary"
+                        style={{ marginTop: "16px" }}
                     >
                         {analyzing ? (
                             <>
@@ -150,113 +151,87 @@ function SnippetForm({ onSave, saving }) {
                 )}
             </div>
 
-            {/* Loading skeleton */}
+            {/* Loading Skeleton */}
             {analyzing && (
                 <div className="form-section-dark skeleton-container">
                     <div className="skeleton-text-dark">Understanding your code...</div>
                     <div className="skeleton-block-dark"></div>
                     <div className="skeleton-block-dark short"></div>
-                    <div className="skeleton-block-dark shorter"></div>
                 </div>
             )}
 
-            {/* Review section */}
+            {/* Review & Edit Section */}
             {showReview && !analyzing && (
-                <div className="form-section-dark review-section-dark">
-                    <div className="review-header-dark">
+                <div className="review-section-dark">
+                    <div className="review-header-dark" style={{ marginBottom: "1.5rem" }}>
                         <Sparkles size={16} />
-                        <span>Generated Details</span>
-                        <span className="review-badge-dark">Review</span>
+                        <span>Snippet Details</span>
                     </div>
 
                     {/* Title */}
-                    <div className="form-field-dark">
-                        <label className="form-label-dark">
-                            <FileText size={14} />
-                            <span>Title</span>
-                        </label>
+                    <div className="input-group">
+                        <label className="std-label">Title</label>
                         <input
                             type="text"
                             value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Snippet title"
-                            className="form-input-dark"
+                            onChange={(e) => updateField("title", e.target.value)}
+                            className="std-input"
+                            placeholder="Snippet Title"
                         />
                     </div>
 
                     {/* Topic */}
-                    <div className="form-field-dark">
-                        <label className="form-label-dark">
-                            <FileText size={14} />
-                            <span>Topic</span>
-                        </label>
+                    <div className="input-group">
+                        <label className="std-label">Topic</label>
                         <input
                             type="text"
                             value={topic}
-                            onChange={(e) => setTopic(e.target.value)}
-                            placeholder="e.g., Binary Search, DP"
-                            className="form-input-dark"
+                            onChange={(e) => updateField("topic", e.target.value)}
+                            className="std-input"
+                            placeholder="e.g. Algorithms"
                         />
                     </div>
 
                     {/* Tags */}
-                    <div className="form-field-dark">
-                        <label className="form-label-dark">
-                            <Tag size={14} />
-                            <span>Tags</span>
-                        </label>
-
-                        {parsedTags.length > 0 && (
-                            <div className="tag-editor-dark">
-                                {parsedTags.map((tag, index) => (
-                                    <span key={index} className="editable-tag-dark">
-                                        {tag}
-                                        <button
-                                            type="button"
-                                            className="tag-remove-dark"
-                                            onClick={() => handleRemoveTag(tag)}
-                                        >
-                                            <X size={12} />
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-
-                        <input
-                            type="text"
-                            value={tagsInput}
-                            onChange={(e) => setTagsInput(e.target.value)}
-                            placeholder="Add tags (comma separated)"
-                            className="form-input-dark"
-                        />
+                    <div className="input-group">
+                        <label className="std-label">Tags</label>
+                        <div className="tag-input-row" style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                                type="text"
+                                value={tagsInput}
+                                onChange={(e) => setTagsInput(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
+                                className="std-input"
+                                placeholder="Add tag + Enter"
+                            />
+                            <button onClick={handleAddTag} className="std-btn-outline" style={{ width: 'auto' }}>
+                                <Plus size={16} />
+                            </button>
+                        </div>
+                        <div className="tag-list mt-2" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                            {tags.map(tag => (
+                                <span key={tag} className="tag-chip-dark">
+                                    {tag}
+                                    <button onClick={() => handleRemoveTag(tag)} style={{ marginLeft: '6px', cursor: 'pointer', background: 'none', border: 'none', color: 'inherit', padding: 0, display: 'flex' }}>
+                                        <X size={12} />
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="review-actions-dark">
-                        <button
-                            onClick={handleSave}
-                            disabled={!canSave}
-                            className="btn-save-dark"
-                        >
-                            {saving ? (
-                                <>
-                                    <Loader size={16} className="spinning" />
-                                    <span>Saving...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Check size={16} />
-                                    <span>Confirm Save</span>
-                                </>
-                            )}
+                    <div className="review-actions-dark" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '2rem' }}>
+                        <button onClick={handleCancel} disabled={saving} className="std-btn-outline" style={{ justifyContent: 'center' }}>
+                            Cancel
                         </button>
                         <button
-                            onClick={handleCancel}
-                            disabled={saving}
-                            className="btn-cancel-dark"
+                            onClick={handleConfirmSave}
+                            disabled={!isFormValid || saving}
+                            className="std-btn-primary"
                         >
-                            Cancel
+                            {saving ? <Loader size={16} className="spinning" /> : <Check size={16} />}
+                            <span>{saving ? "Saving..." : "Save Snippet"}</span>
                         </button>
                     </div>
                 </div>

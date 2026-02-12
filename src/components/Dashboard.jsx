@@ -10,30 +10,29 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getSnippets, saveSnippet, updateSnippetAI } from "../utils/storage";
-import { generateSnippetNotes } from "../utils/groq";
+import { getSnippets, updateSnippetAI } from "../utils/storage";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
-import SnippetForm from "./SnippetForm";
 import SnippetList from "./SnippetList";
 import SnippetDetail from "./SnippetDetail";
-import AIInsights from "./AIInsights";
+import RecallMode from "./RecallMode";
 import Settings from "./Settings";
+import Home from "./Home";
+import AnalyticsDashboard from "./AnalyticsDashboard";
+import DashboardHome from "./DashboardHome";
 
 function Dashboard() {
     const { user, logout } = useAuth();
 
     // Snippets state
+    // Snippets state
     const [snippets, setSnippets] = useState([]);
     const [selectedSnippet, setSelectedSnippet] = useState(null);
 
-    // Loading states
+    // Loading status
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-
 
     // Per-snippet notes state (transient)
-    // { [snippetId]: "idle" | "generating" | "done" | "error" }
     const [notesStatus, setNotesStatus] = useState({});
 
     // Search and filter
@@ -45,30 +44,86 @@ function Dashboard() {
 
     // Initialize section from URL
     const [activeSection, setActiveSection] = useState(() => {
-        const path = window.location.pathname.slice(1); // remove leading slash
-        if (path === "ai-insights") return "insights";
-        if (["dashboard", "snippets", "settings"].includes(path)) return path;
-        return "dashboard";
+        // Strict mapping on initial load
+        return getSectionFromPath(window.location.pathname);
     });
+
+    // Helper: Map path to section
+    function getSectionFromPath(pathname) {
+        // Normalize path
+        const path = pathname.startsWith("/") ? pathname.slice(1) : pathname;
+
+        if (path === "" || path === "home") return "home";
+        if (path.startsWith("recall")) return "recall";
+        if (path.startsWith("snippets")) return "snippets";
+        if (path.startsWith("settings")) return "settings";
+        if (path.startsWith("analytics")) return "dashboard"; // /analytics -> dashboard
+
+        return "home"; // Default fallback
+    }
 
     // Sync state to URL when changed (pushed)
     function handleSectionChange(section) {
         setActiveSection(section);
-        const path = section === "insights" ? "ai-insights" : section;
+        const path = section;
         window.history.pushState(null, "", `/${path}`);
     }
 
     // Handle back button (popstate)
+    // Handle back button (popstate) & Deep Linking
     useEffect(() => {
         const handlePopState = () => {
-            const path = window.location.pathname.slice(1);
-            if (path === "ai-insights") setActiveSection("insights");
-            else if (["dashboard", "snippets", "settings"].includes(path)) setActiveSection(path);
-            else setActiveSection("dashboard");
+            const newSection = getSectionFromPath(window.location.pathname);
+            setActiveSection(newSection);
+
+            // Check for deep linking params
+            const params = new URLSearchParams(window.location.search);
+            const snippetId = params.get("id");
+
+            if (snippetId && newSection === "snippets") {
+                // If we have snippets loaded, select it
+                // Logic handled in the deep-linking effect below (or by parent)
+            }
         };
+
         window.addEventListener("popstate", handlePopState);
         return () => window.removeEventListener("popstate", handlePopState);
     }, []);
+
+    // Handle New Snippet Creation (from Home)
+    const handleSnippetCreated = (newSnippet) => {
+        // 1. Optimistic Update
+        setSnippets(prev => [newSnippet, ...prev]);
+
+        // 2. Select it
+        setSelectedSnippet(newSnippet);
+
+        // 3. Redirect to Snippets list
+        handleSectionChange("snippets");
+
+        // 4. Update URL with ID for persistence
+        window.history.replaceState(null, "", `/snippets?id=${newSnippet.id}`);
+    };
+
+    // Deep Linking Effect (Runs when snippets are loaded)
+    useEffect(() => {
+        if (!loading && snippets.length > 0) {
+            const params = new URLSearchParams(window.location.search);
+            const snippetId = params.get("id");
+            const tab = params.get("tab");
+
+            if (snippetId && window.location.pathname === "/snippets") {
+                const found = snippets.find(s => s.id === snippetId);
+                if (found) {
+                    setSelectedSnippet(found);
+                    // If tab is 'visualize', specific handling might be needed in SnippetDetail
+                    // For now we just select the snippet. 
+                    // To handle tab switching, we might need to pass a prop to SnippetDetail
+                    // or SnippetDetail should read the URL itself.
+                }
+            }
+        }
+    }, [loading, snippets]);
 
     // Load snippets on mount
     useEffect(() => {
@@ -267,15 +322,44 @@ function Dashboard() {
     }
 
     // Determine if we should show snippet UI (search bar etc)
-    const isSnippetView = activeSection === "dashboard" || activeSection === "snippets";
+    const isSnippetView = activeSection === "snippets";
 
+    // Handle snippet update/delete from Detail view
+    function handleSnippetUpdate(updatedSnippet) {
+        setSnippets(prev => prev.map(s => s.id === updatedSnippet.id ? updatedSnippet : s));
+        setSelectedSnippet(updatedSnippet);
+    }
+
+    function handleSnippetDelete(deletedId) {
+        setSnippets(prev => prev.filter(s => s.id !== deletedId));
+        if (selectedSnippet?.id === deletedId) {
+            setSelectedSnippet(null);
+        }
+    }
+
+    // Render section content
     // Render section content
     function renderContent() {
         switch (activeSection) {
-            case "insights":
+            case "home":
                 return (
                     <main className="section-content">
-                        <AIInsights snippets={snippets} />
+                        <DashboardHome onSnippetCreated={handleSnippetCreated} />
+                    </main>
+                );
+            case "dashboard":
+                return (
+                    <main className="section-content">
+                        <AnalyticsDashboard snippets={snippets} />
+                    </main>
+                );
+            case "recall":
+                return (
+                    <main className="section-content-fixed">
+                        <RecallMode
+                            snippets={snippets}
+                            onNavigate={handleSectionChange}
+                        />
                     </main>
                 );
             case "settings":
@@ -284,7 +368,6 @@ function Dashboard() {
                         <Settings user={user} onLogout={logout} />
                     </main>
                 );
-            case "dashboard":
             case "snippets":
             default:
                 return (
@@ -292,7 +375,7 @@ function Dashboard() {
                         {/* Left pane - Snippet list */}
                         <section className="pane pane-list">
                             <div className="pane-header">
-                                <h2>{activeSection === "dashboard" ? "Your Snippets" : "Snippets"}</h2>
+                                <h2>Your Snippets</h2>
                                 <span className="snippet-count">{filteredSnippets.length}</span>
                             </div>
                             {filterDate && (
@@ -306,23 +389,21 @@ function Dashboard() {
                             />
                         </section>
 
-                        {/* Center pane - Snippet detail */}
+                        {/* Right pane - Snippet detail */}
                         <section className="pane pane-detail">
                             <SnippetDetail
                                 snippet={selectedSnippet}
                                 notesStatus={selectedSnippet ? (notesStatus[selectedSnippet.id] || "idle") : "idle"}
                                 onRetryNotes={handleRetryNotes}
+                                onUpdate={handleSnippetUpdate}
+                                onDelete={handleSnippetDelete}
                             />
-                        </section>
-
-                        {/* Right pane - Snippet form */}
-                        <section className="pane pane-form">
-                            <SnippetForm onSave={handleSaveSnippet} saving={saving} />
                         </section>
                     </main>
                 );
         }
     }
+
 
     return (
         <div className="app-layout">
