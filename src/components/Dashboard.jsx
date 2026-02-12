@@ -11,6 +11,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getSnippets, updateSnippetAI } from "../utils/storage";
+import { generateSnippetNotes } from "../utils/groq";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import SnippetList from "./SnippetList";
