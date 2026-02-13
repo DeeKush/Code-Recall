@@ -104,16 +104,12 @@ export async function saveSnippet(userId, snippet) {
             createdAtReadable: readableDate          // Human-readable string
         };
 
-        console.log("[DEBUG] Prepared snippetData:", snippetData);
-
         // Reference to this user's snippets collection
         const snippetsRef = collection(db, "users", userId, "snippets");
 
         // Add the document to Firestore WITH TIMEOUT (10 seconds max)
         // This prevents the save button from staying locked forever
-        console.log("[DEBUG] Adding document to Firestore (10s timeout)...");
         const docRef = await withTimeout(addDoc(snippetsRef, snippetData), 10000);
-        console.log("[DEBUG] Document added successfully! ID:", docRef.id);
 
         // Return the complete snippet with ID for immediate use
         return {

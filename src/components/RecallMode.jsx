@@ -7,10 +7,11 @@
 
 import { useState, useMemo, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Sparkles, BookOpen, ChevronDown, ChevronRight, Info, Eye, EyeOff, CheckCircle, RotateCcw, Lock, Trophy, Clock, AlertCircle, Zap, Target, AlertTriangle, Monitor, HardDrive } from "lucide-react";
+import { Sparkles, BookOpen, ChevronDown, ChevronRight, Info, Eye, EyeOff, CheckCircle, RotateCcw, Lock, Trophy, Clock, AlertCircle, Zap, Target, AlertTriangle, Monitor, HardDrive, RefreshCw } from "lucide-react";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { updateSnippetRecall } from "../utils/storage";
+import { updateSnippetRecall, updateSnippetAI } from "../utils/storage";
+import { generateSnippetNotes } from "../utils/groq";
 import { useAuth } from "../context/AuthContext";
 
 // Local Component: Read-Only Queue Card (Lightweight)
@@ -45,7 +46,6 @@ function RecallQueueCard({ snippet, isActive, onClick }) {
 }
 
 // Local Component: Accordion for AI Notes
-// Uses .ai-note-block for styling
 function NoteAccordion({ title, content, icon: Icon, defaultOpen = false }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
@@ -85,6 +85,7 @@ function RecallMode({ snippets = [], onNavigate }) {
     const [selectedId, setSelectedId] = useState(null);
     const [isCodeRevealed, setIsCodeRevealed] = useState(false);
     const [statsSaving, setStatsSaving] = useState(false);
+    const [generatingNotes, setGeneratingNotes] = useState(false);
 
     // Derived: Current Active Snippet
     const currentSnippet = useMemo(() =>
@@ -109,58 +110,44 @@ function RecallMode({ snippets = [], onNavigate }) {
     useEffect(() => {
         if (!snippets || snippets.length === 0) return;
 
-        console.log("[RECALL] Building Custom Selection Queue...");
         const now = new Date();
         const todayStr = now.toDateString();
 
-        // Calculate "Yesterday" string for exclusion
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toDateString();
-
-        // 1. Exclude revised yesterday or today
+        // 1. Exclude reviewed TODAY
         const eligible = snippets.filter(s => {
             if (!s.lastRecalledAt?.seconds) return true; // Never recalled = Eligible
 
             const lastDate = new Date(s.lastRecalledAt.seconds * 1000);
             const lastDateStr = lastDate.toDateString();
 
-            return lastDateStr !== todayStr && lastDateStr !== yesterdayStr;
+            return lastDateStr !== todayStr;
         });
 
         // 2. Prioritize (Calculate Scores)
         const scored = eligible.map(s => {
-            // A. Hard/Confusing (Revisit) -> Highest Priority
-            const isHard = s.lastFeedback === 'revisit';
+            let daysSince = 0;
 
-            // B. Lowest Score/Streak (Lower is better for recall needs)
-            // If streak is high, priority is low. 
-            const streak = s.recallStreak || 0;
-
-            // C. Oldest (Spaced Repetition) -> Higher priority
-            let daysSince = 100; // Default for new
-            if (s.lastRecalledAt?.seconds) {
+            // A. Days Since Last Review
+            if (!s.lastRecalledAt?.seconds) {
+                // NEVER reviewed -> Treat as very old (High Priority)
+                daysSince = 999;
+            } else {
                 const lastDate = new Date(s.lastRecalledAt.seconds * 1000);
                 const diffTime = Math.abs(now - lastDate);
                 daysSince = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             }
 
-            // D. Medium Length Bonus (Tie-breaker)
-            // Very short (< 50) or very long (> 2000) get 0 bonus. Medium gets +1.
-            const len = s.code ? s.code.length : 0;
-            const isMediumLength = len > 50 && len < 2000;
+            // B. Stats
+            const revisitCount = s.revisitCount || 0;
+            const understoodCount = s.understoodCount || 0;
 
-            // COMPOSITE SCORE (Higher = Pick first)
-            // 1. Hard: +10000
-            // 2. Low Streak: + (100 - streak) * 10  (Assuming max streak ~100)
-            // 3. Days Since: + daysSince * 5
-            // 4. Medium Length: + 1
-
-            let priority = 0;
-            if (isHard) priority += 10000;
-            priority += (100 - Math.min(streak, 100)) * 10;
-            priority += daysSince * 5;
-            if (isMediumLength) priority += 1;
+            // C. FORMULA
+            // Score = (daysSince * 2) + (revisitCount * 2) - understoodCount
+            // Logic: 
+            // - Old items (high days) -> Boost
+            // - Hard items (high revisit) -> Boost
+            // - Mastered items (high understood) -> Penalty
+            let priority = (daysSince * 2) + (revisitCount * 2) - understoodCount;
 
             return { ...s, selectionPriority: priority };
         });
@@ -168,23 +155,11 @@ function RecallMode({ snippets = [], onNavigate }) {
         // Sort by Priority Descending
         scored.sort((a, b) => b.selectionPriority - a.selectionPriority);
 
-        // 3. Select 7 with Diversity (Max 2 per topic)
-        const selected = [];
-        const topicCounts = {};
+        // 3. Select Top 10
+        // We pick top 10 regardless of topic diversity for now to ensure "hardest" come first
+        // But we can add a slight diversity check if needed later.
+        const selected = scored.slice(0, 10);
 
-        for (const snippet of scored) {
-            if (selected.length >= 7) break; // Stop at 7
-
-            const topic = snippet.topic || "Unknown";
-            const currentCount = topicCounts[topic] || 0;
-
-            if (currentCount < 2) {
-                selected.push(snippet);
-                topicCounts[topic] = currentCount + 1;
-            }
-        }
-
-        console.log(`[RECALL] Selected ${selected.length} snippets for session.`);
         setRecallQueue(selected);
 
         if (selected.length > 0) {
@@ -232,11 +207,39 @@ function RecallMode({ snippets = [], onNavigate }) {
         }
     };
 
+    const handleGenerateNotes = async () => {
+        if (!currentSnippet || !user) return;
+        setGeneratingNotes(true);
+
+        try {
+            const notesData = await generateSnippetNotes(
+                currentSnippet.code,
+                currentSnippet.title,
+                currentSnippet.topic
+            );
+
+            // Save to DB
+            await updateSnippetAI(user.uid, currentSnippet.id, notesData, "success");
+
+            // Update local state by forcing a re-render or updating current object
+            // Ideally parent updates snippets, but for now we hack it locally?
+            // Actually, `snippets` prop will update if Dashboard updates.
+            // But we need to update `recallQueue` too.
+            const updatedSnippet = { ...currentSnippet, aiNotes: notesData.aiNotes, aiStatus: "success" };
+
+            setRecallQueue(prev => prev.map(s => s.id === currentSnippet.id ? updatedSnippet : s));
+
+        } catch (error) {
+            console.error("Failed to generate notes:", error);
+            alert("Failed to generate notes. " + error.message);
+        } finally {
+            setGeneratingNotes(false);
+        }
+    };
+
     // -------------------------------------------
     // 3. HELPER: Note Sections Configuration
     // -------------------------------------------
-    // Specifically requested order:
-    // Problem, Intuition, Approach, Time Complexity, Space Complexity, Edge Cases
     const NOTE_SECTIONS = [
         { key: "problem", title: "Problem Statement", icon: AlertCircle, defaultOpen: true },
         { key: "intuition", title: "Intuition", icon: Zap, defaultOpen: true },
@@ -256,7 +259,7 @@ function RecallMode({ snippets = [], onNavigate }) {
                     <div className="completion-card">
                         <Info size={48} className="completion-icon" />
                         <h2>No Snippets Yet</h2>
-                        <p>Create some snippets with AI notes to start recalling.</p>
+                        <p>Create some snippets to start recalling.</p>
                     </div>
                 </div>
             );
@@ -292,7 +295,7 @@ function RecallMode({ snippets = [], onNavigate }) {
         currentSnippet.aiNotes.problem ||
         currentSnippet.aiNotes.intuition ||
         currentSnippet.aiNotes.approach ||
-        currentSnippet.aiNotes.explanation // Legacy support
+        currentSnippet.aiNotes.explanation
     );
 
     // -------------------------------------------
@@ -343,7 +346,7 @@ function RecallMode({ snippets = [], onNavigate }) {
                             </div>
                         </div>
 
-                        {/* Content: AI Notes (Strict Order) */}
+                        {/* Content: AI Notes or CTA */}
                         <div className="recall-notes-section">
                             {hasNotes ? (
                                 <>
@@ -363,7 +366,7 @@ function RecallMode({ snippets = [], onNavigate }) {
                                         return null;
                                     })}
 
-                                    {/* Legacy Fallback: If no problem/intuition but has explanation */}
+                                    {/* Legacy Fallback */}
                                     {!currentSnippet.aiNotes.problem && currentSnippet.aiNotes.explanation && (
                                         <NoteAccordion
                                             title="Explanation"
@@ -374,9 +377,23 @@ function RecallMode({ snippets = [], onNavigate }) {
                                     )}
                                 </>
                             ) : (
-                                <div className="no-notes-warning">
-                                    <AlertCircle size={16} />
-                                    <span>No AI Notes available for this snippet.</span>
+                                <div className="no-notes-cta">
+                                    <div className="cta-content">
+                                        <Sparkles size={32} className="cta-icon" />
+                                        <h3>Missing AI Notes</h3>
+                                        <p>This snippet doesn't have AI notes yet. Generate them to enable effective recall.</p>
+                                        <button
+                                            className="std-btn-primary"
+                                            onClick={handleGenerateNotes}
+                                            disabled={generatingNotes}
+                                        >
+                                            {generatingNotes ? (
+                                                <><RefreshCw className="spinning" size={16} /> Generating...</>
+                                            ) : (
+                                                <><Sparkles size={16} /> Generate Notes</>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -391,6 +408,7 @@ function RecallMode({ snippets = [], onNavigate }) {
                                         <button
                                             className="std-btn-primary reveal-btn"
                                             onClick={() => setIsCodeRevealed(true)}
+                                            style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}
                                         >
                                             <Eye size={16} /> Reveal Code
                                         </button>

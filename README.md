@@ -1,16 +1,86 @@
-# React + Vite
+# CodeRecall - AI-Powered Code Retention System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+CodeRecall is a modern spaced-repetition learning platform designed specifically for developers to retain and master code snippets. It combines a sleek, dark-themed UI with powerful AI features to help you understand and start recalling complex algorithms and patterns.
 
-Currently, two official plugins are available:
+## 🚀 Key Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Smart Snippet Management**: Save and organize code snippets with auto-generated titles, tags, and topics.
+- **AI-Powered Insights**: Automatically generates "Problem", "Intuition", "Approach", and "Time/Space Complexity" notes for every snippet using Groq/Llama3.
+- **Recall Mode (SRS)**: A scientifically grounded Spaced Repetition System that surfaces snippets you're about to forget.
+    - *Algorithm V2*: Prioritizes snippets based on review history, difficulty, and age.
+    - *Daily Queue*: Limits study sessions to avoid burnout.
+- **Code Visualizer**: Step-by-step execution visualization for Java and C++ snippets to build mental models.
+- **Secure Cloud Storage**: Built on Firebase for authentication and real-time data persistence.
 
-## React Compiler
+## 🛠 Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React (Vite), CSS3 (Variables, Flexbox/Grid)
+- **Backend/Auth**: Firebase (Firestore, Auth)
+- **AI Integration**: Groq API (Llama3-70b-8192) / OpenRouter
+- **Icons**: Lucide-React
 
-## Expanding the ESLint configuration
+## 📅 7-Day Build Sprint Log
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **Day 1: Project Setup**
+    - Initialized React + Vite project structure.
+    - Configured Firebase Authentication and routing.
+    - Set up environment variables and basic security.
+
+- **Day 2: Core UI Components**
+    - Built specific Dashboard layout and Sidebar navigation.
+    - Designed the "Snippet Card" component.
+    - Implemented responsiveness basics.
+
+- **Day 3: Database & CRUD**
+    - Integrated Firestore for data persistence.
+    - Created `storage.js` service for standardized DB operations.
+    - Implemented "My Snippets" list view with real-time updates.
+
+- **Day 4: AI Integration & Theme**
+    - Integrated Groq API for generating metadata (tags, titles) and detailed study notes.
+    - Applied the "Modern Dark SaaS" theme (Day 4 Styles).
+    - Refined UI consistency across Auth and Dashboard pages.
+
+- **Day 5: Code Visualizer**
+    - Developed the custom AST-based interpreter for Java/C++.
+    - Built the Visualizer Modal with step-by-step execution controls.
+    - Implemented variable state tracking and array visualization.
+
+- **Day 6: Testing & Refinement**
+    - Refactored Visualizer logic into specific utilities.
+    - Added unit tests for the interpreter.
+    - Fixed edge cases in C++ vector parsing.
+
+- **Day 7: Recall Mode V1**
+    - Implemented the Spaced Repetition algorithm foundation.
+    - Created the Recall Mode UI with "Reveal Code" interaction.
+    - Set up the review loop (Understood/Revisit).
+
+- **Day 8: Production Polish (Current)**
+    - **Recall Algorithm V2**: Refined scoring to prioritize "hard" and "new" items correctly.
+    - **Stability**: Added guards to prevent AI note regeneration.
+    - **UX**: Added "Missing Notes" CTA and restricted Visualizer to supported languages.
+    - **Cleanup**: Removed debug logs and finalized branding.
+
+## 📦 Installation
+
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Set up `.env` with your API keys:
+   ```env
+   VITE_FIREBASE_API_KEY=...
+   VITE_GROQ_API_KEY=...
+   ```
+4. Run locally:
+   ```bash
+   npm run dev
+   ```
+
+## 🔮 Future Roadmap
+
+- [ ] Support for Python visualization.
+- [ ] Mobile-responsive visualizer.
+- [ ] Community snippet sharing.

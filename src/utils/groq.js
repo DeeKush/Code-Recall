@@ -117,7 +117,7 @@ async function callAI(messages) {
     // 1. Try each Groq key
     for (let i = 0; i < GROQ_KEYS.length; i++) {
         try {
-            console.log(`[AI] Trying Groq key ${i + 1}/${GROQ_KEYS.length}...`);
+            // console.log(`[AI] Trying Groq key ${i + 1}/${GROQ_KEYS.length}...`);
             return await callGroqWithKey(messages, GROQ_KEYS[i]);
         } catch (err) {
             console.warn(`[AI] Groq key ${i + 1} failed: ${err.message}`);

@@ -15,9 +15,9 @@ import {
     Settings,
     Menu,
     X,
-    Brain,
     Home
 } from "lucide-react";
+import logo from "../assets/logo.png";
 
 function Sidebar({ activeSection = "dashboard", onSectionChange, isOpen, onToggle }) {
     // Navigation items configuration
@@ -44,8 +44,7 @@ function Sidebar({ activeSection = "dashboard", onSectionChange, isOpen, onToggl
                 {/* Logo section */}
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
-                        <Brain size={28} className="logo-icon" />
-                        <span className="logo-text">Code Recall</span>
+                        <img src={logo} alt="CodeRecall" className="logo-image" style={{ height: '45px', width: 'auto' }} />
                     </div>
                     <button
                         className="sidebar-close"

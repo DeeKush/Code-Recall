@@ -152,8 +152,7 @@ function Dashboard() {
         let savedSnippet = null;
 
         try {
-            // Save snippet with reviewed metadata
-            console.log("[DASHBOARD] Saving snippet...");
+            // Saving snippet...
             savedSnippet = await saveSnippet(user.uid, {
                 code: snippetData.code,
                 title: snippetData.title,
@@ -162,7 +161,8 @@ function Dashboard() {
                 aiTags: snippetData.tags
             });
 
-            console.log("[DASHBOARD] Snippet saved:", savedSnippet.id);
+            // Snippet saved
+            const savedSnippetLog = savedSnippet.id;
 
             // Update UI immediately
             setSnippets([savedSnippet, ...snippets]);
@@ -180,9 +180,11 @@ function Dashboard() {
         // ----------------------------------------
         // Background: Generate notes
         // ----------------------------------------
-        // ----------------------------------------
-        // Background: Generate notes
-        // ----------------------------------------
+        // GUARD: If AI notes already exist (e.g. from a backup or import), DO NOT regenerate.
+        if (savedSnippet.aiNotes) {
+            return;
+        }
+
         setNotesStatus(prev => ({ ...prev, [savedSnippet.id]: "generating" }));
 
         try {
@@ -345,7 +347,11 @@ function Dashboard() {
             case "home":
                 return (
                     <main className="section-content">
-                        <DashboardHome onSnippetCreated={handleSnippetCreated} />
+                        <DashboardHome
+                            onSnippetCreated={handleSaveSnippet}
+                            snippets={snippets}
+                            onNavigate={handleSectionChange}
+                        />
                     </main>
                 );
             case "dashboard":
