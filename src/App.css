@@ -6046,3 +6046,78 @@ textarea:focus-visible,
     /* Force show on desktop */
   }
 }
+
+/* ==========================================
+   EDIT MODE STYLES (Dark Theme Fix)
+   ========================================== */
+.edit-input-title {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.edit-input-title:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+  background-color: var(--bg-card);
+}
+
+.edit-input-field {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.edit-input-field:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+  background-color: var(--bg-card);
+}
+
+.edit-tags-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.code-editor-textarea {
+  width: 100%;
+  min-height: 400px;
+  padding: 1.5rem;
+  background-color: #1e1e1e;
+  color: var(--code-text);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.code-editor-textarea:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
