@@ -31,7 +31,7 @@ function Sidebar({ activeSection = "dashboard", onSectionChange, isOpen, onToggl
         { id: "snippets", label: "My Snippets", icon: Code2 },
         { id: "recall", label: "Recall Mode", icon: Sparkles },
         { id: "dashboard", label: "Analytics", icon: LayoutDashboard },
-        { id: "settings", label: "Settings", icon: Settings }
+        { id: "settings", label: "Settings", icon: SettingsIcon }
     ];
 
     return (
