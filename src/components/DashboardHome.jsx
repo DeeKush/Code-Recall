@@ -67,9 +67,14 @@ function DashboardHome({ onSnippetCreated, snippets, onNavigate }) {
         if (!user) return;
         setSaving(true);
         try {
-            await onSnippetCreated(snippetData);
+            const newId = await onSnippetCreated(snippetData);
             setSnippetData({ code: "", title: "", topic: "", tags: [] });
             setShowReview(false);
+
+            if (newId) {
+                window.history.pushState(null, "", `/snippets?id=${newId}`);
+                onNavigate("snippets");
+            }
         } catch (error) {
             console.error("Failed to save snippet:", error);
         } finally {

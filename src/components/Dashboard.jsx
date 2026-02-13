@@ -10,7 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getSnippets, updateSnippetAI } from "../utils/storage";
+import { getSnippets, saveSnippet, updateSnippetAI } from "../utils/storage";
 import { generateSnippetNotes } from "../utils/groq";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
@@ -32,6 +32,7 @@ function Dashboard() {
 
     // Loading status
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
     // Per-snippet notes state (transient)
     const [notesStatus, setNotesStatus] = useState({});
@@ -234,6 +235,8 @@ function Dashboard() {
             setNotesStatus(prev => ({ ...prev, [savedSnippet.id]: "error" }));
 
         }
+
+        return savedSnippet.id;
     }
 
     // Select a snippet

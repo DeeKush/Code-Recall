@@ -5253,8 +5253,10 @@ textarea:focus-visible,
    ========================================== */
 
 .home-dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
   width: 100%;
-  padding: 0;
   min-height: 100%;
   display: flex;
   flex-direction: column;
@@ -5267,6 +5269,14 @@ textarea:focus-visible,
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .home-welcome-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
 }
 
 .welcome-identity h1 {
@@ -5302,9 +5312,15 @@ textarea:focus-visible,
 /* 2. Main Layout (40/60) */
 .home-main-layout {
   display: grid;
-  grid-template-columns: 4fr 6fr;
-  gap: 24px;
+  grid-template-columns: 2fr 3fr;
+  gap: 20px;
   align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .home-main-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Panels */
@@ -5317,6 +5333,19 @@ textarea:focus-visible,
   padding: 1.25rem 1.5rem;
   position: relative;
   overflow: hidden;
+}
+
+@media (max-width: 600px) {
+
+  .create-left-panel,
+  .create-right-preview,
+  .create-right-empty {
+    padding: 1rem;
+  }
+
+  .create-right-empty {
+    min-height: 200px;
+  }
 }
 
 /* Left Panel Specifics */
@@ -5356,6 +5385,8 @@ textarea:focus-visible,
   display: flex;
   align-items: center;
   margin-top: 1rem;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .btn-text-action {

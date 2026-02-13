@@ -199,18 +199,24 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes, onUpdate, onDelete 
     }, [vizModalOpen]);
 
     // Run visualization (unified)
-    const handleRunVisualization = useCallback(() => {
+    const handleRunVisualization = useCallback((customInputs = null) => {
         if (!snippet?.code) return;
         setVizError("");
         setVizRunning(true);
-        setDryRunInputs(null);
+        // Only clear inputs if we aren't reusing them
+        if (!customInputs) {
+            setDryRunInputs(null);
+        }
         setDetectedLang("");
         try {
-            const result = visualizeSnippet(snippet.code);
+            // Pass customInputs (or null) to visualizeSnippet
+            const result = visualizeSnippet(snippet.code, customInputs);
             setDetectedLang(result.language || "");
+
             if (result.dryRunInputs) {
                 setDryRunInputs(result.dryRunInputs);
             }
+
             if (result.error) {
                 setVizError(result.error === "__unsupported__"
                     ? "Only Java and C++ are supported for visualization right now. More languages are coming soon."
@@ -227,14 +233,19 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes, onUpdate, onDelete 
         } finally {
             setVizRunning(false);
         }
-    }, [snippet?.code, aiInputsFetched]);
+    }, [snippet?.code]);
 
     // Enhanced visualization with AI inputs
     const handleRunVisualizationWithAI = useCallback(async () => {
         if (!snippet?.code) return;
 
-        // 1. Run immediate visualization with defaults
-        handleRunVisualization();
+        // 1. If we already have inputs (from previous run), reuse them
+        //    Otherwise run with defaults first
+        if (dryRunInputs) {
+            handleRunVisualization(dryRunInputs);
+        } else {
+            handleRunVisualization();
+        }
 
         // 2. If we haven't fetched AI inputs yet, try to get them
         if (!aiInputsFetched) {
@@ -265,7 +276,7 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes, onUpdate, onDelete 
                 console.error("Failed to fetch smart inputs:", err);
             }
         }
-    }, [snippet?.code, aiInputsFetched, handleRunVisualization]);
+    }, [snippet?.code, aiInputsFetched, handleRunVisualization, dryRunInputs]);
 
     // Open modal and auto-run
     const openVizModal = useCallback(() => {
