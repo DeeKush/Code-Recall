@@ -7,12 +7,30 @@
 //   - Feature highlights
 // ==========================================
 
-import { Code2, Sparkles, BookOpen, ArrowRight, Zap } from "lucide-react";
-import logo from "../assets/logo.png";
+import { Brain, Code2, Sparkles, BookOpen, ArrowRight, Zap } from "lucide-react";
 
 function Landing({ onGetStarted, onLogin }) {
     const features = [
-        // ... (features array remains same)
+        {
+            icon: Code2,
+            title: "Save Code Snippets",
+            description: "Store your DSA solutions, algorithms, and competitive programming code in one place."
+        },
+        {
+            icon: Sparkles,
+            title: "AI-Powered Notes",
+            description: "Automatically generate structured learning notes with problem explanation, intuition, and complexity analysis."
+        },
+        {
+            icon: BookOpen,
+            title: "Instant Recall",
+            description: "Search and find any snippet instantly. Perfect for revision before interviews or contests."
+        },
+        {
+            icon: Zap,
+            title: "Learn Faster",
+            description: "AI-generated tags and topics help you organize and understand patterns across your solutions."
+        }
     ];
 
     return (
@@ -20,7 +38,8 @@ function Landing({ onGetStarted, onLogin }) {
             {/* Navigation */}
             <nav className="home-nav">
                 <div className="home-logo">
-                    <img src={logo} alt="CodeRecall" className="home-logo-img" style={{ height: '50px', width: 'auto' }} />
+                    <Brain size={32} className="home-logo-icon" />
+                    <span>Code Recall</span>
                 </div>
                 <button onClick={onLogin} className="btn-nav-login">
                     Login
