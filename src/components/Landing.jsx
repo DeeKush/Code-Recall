@@ -6,8 +6,9 @@
 //   - CTA buttons for Get Started / Login
 //   - Feature highlights
 // ==========================================
-
-import { Brain, Code2, Sparkles, BookOpen, ArrowRight, Zap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import logo from "../assets/logo.png";
+import { ArrowRight, Code, Zap, BarChart, CheckCircle, Smartphone, Globe, Shield, Star, Github, Code2 } from "lucide-react";
 
 function Landing({ onGetStarted, onLogin }) {
     const features = [
@@ -36,14 +37,16 @@ function Landing({ onGetStarted, onLogin }) {
     return (
         <div className="home-page">
             {/* Navigation */}
-            <nav className="home-nav">
-                <div className="home-logo">
-                    <Brain size={32} className="home-logo-icon" />
-                    <span>Code Recall</span>
+            <nav className="landing-nav">
+                <div className="nav-logo">
+                    <img src={logo} alt="CodeRecall" style={{ height: '36px', width: 'auto' }} />
+                    <span>CodeRecall</span>
                 </div>
-                <button onClick={onLogin} className="btn-nav-login">
-                    Login
-                </button>
+                <div className="nav-links">
+                    <button onClick={onLogin} className="btn-nav-login">
+                        Login
+                    </button>
+                </div>
             </nav>
 
             {/* Hero Section */}

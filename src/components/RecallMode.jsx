@@ -77,7 +77,7 @@ function NoteAccordion({ title, content, icon: Icon, defaultOpen = false }) {
     );
 }
 
-function RecallMode({ snippets = [], onNavigate }) {
+function RecallMode({ snippets = [], onNavigate, onUpdate }) {
     const { user } = useAuth();
 
     // State
@@ -186,10 +186,25 @@ function RecallMode({ snippets = [], onNavigate }) {
             // 1. Persist to DB
             await updateSnippetRecall(user.uid, snippetId, isUnderstood);
 
-            // 2. Remove from Local Queue
+            // 2. Optimistic Update for Parent (Dashboard)
+            // We need to match Firestore Timestamp format { seconds, ... } so filters work
+            const nowSeconds = Math.floor(Date.now() / 1000);
+            const optimisticSnippet = {
+                ...currentSnippet,
+                lastRecalledAt: { seconds: nowSeconds },
+                lastFeedback: isUnderstood ? "understood" : "revisit",
+                recallStreak: isUnderstood ? (currentSnippet.recallStreak || 0) + 1 : 0,
+                recallCount: (currentSnippet.recallCount || 0) + 1
+            };
+
+            if (onUpdate) {
+                onUpdate(optimisticSnippet);
+            }
+
+            // 3. Remove from Local Queue
             setRecallQueue(prev => prev.filter(s => s.id !== snippetId));
 
-            // 3. Select Next
+            // 4. Select Next
             const nextQueue = recallQueue.filter(s => s.id !== snippetId);
             if (nextQueue.length > 0) {
                 setSelectedId(nextQueue[0].id);

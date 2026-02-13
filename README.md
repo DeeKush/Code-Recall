@@ -1,86 +1,95 @@
-# CodeRecall - AI-Powered Code Retention System
+# CodeRecall 🧠
 
-CodeRecall is a modern spaced-repetition learning platform designed specifically for developers to retain and master code snippets. It combines a sleek, dark-themed UI with powerful AI features to help you understand and start recalling complex algorithms and patterns.
+**AI-Assisted Spaced Repetition for Developers.**
 
-## 🚀 Key Features
+CodeRecall is a specialized snippet manager designed to helping developers internalize complex algorithms, design patterns, and tricky syntax through active recall and AI-powered insights.
 
-- **Smart Snippet Management**: Save and organize code snippets with auto-generated titles, tags, and topics.
-- **AI-Powered Insights**: Automatically generates "Problem", "Intuition", "Approach", and "Time/Space Complexity" notes for every snippet using Groq/Llama3.
-- **Recall Mode (SRS)**: A scientifically grounded Spaced Repetition System that surfaces snippets you're about to forget.
-    - *Algorithm V2*: Prioritizes snippets based on review history, difficulty, and age.
-    - *Daily Queue*: Limits study sessions to avoid burnout.
-- **Code Visualizer**: Step-by-step execution visualization for Java and C++ snippets to build mental models.
-- **Secure Cloud Storage**: Built on Firebase for authentication and real-time data persistence.
+## ✨ Features
 
-## 🛠 Tech Stack
+- **Smart Snippet Management**: Organize code with AI-generated titles, topics, and tags.
+- **AI-Powered Insights**: Auto-generates intuition, time complexity, and edge cases for every snippet using Groq (Llama 3).
+- **Code Visualizer**: Step-by-step execution visualization for Java and C++ algorithms to build mental models.
+- **Recall Mode (Spaced Repetition)**: Active recall sessions with "blur" mode to test your memory. Tracks streaks and "understood" vs "revisit" status.
+- **Multi-Key AI Fallback**: Robust AI client that rotates through multiple API keys to ensure high availability.
+- **Mobile-Responsive Dashboard**: Full feature parity on mobile devices for on-the-go review.
 
-- **Frontend**: React (Vite), CSS3 (Variables, Flexbox/Grid)
-- **Backend/Auth**: Firebase (Firestore, Auth)
-- **AI Integration**: Groq API (Llama3-70b-8192) / OpenRouter
-- **Icons**: Lucide-React
+## 🛠️ Tech Stack
 
-## 📅 7-Day Build Sprint Log
+- **Frontend**: React, Vite
+- **Styling**: Vanilla CSS (Custom Design System, Dark Mode)
+- **Backend/Auth**: Firebase (Firestore, Authentication)
+- **AI**: Groq API (Llama 3-70b), OpenRouter fallback
+- **Visualizer**: Custom execution engine + AI parsing
 
-- **Day 1: Project Setup**
-    - Initialized React + Vite project structure.
-    - Configured Firebase Authentication and routing.
-    - Set up environment variables and basic security.
+## 📅 The 7-Day Build Sprint
 
-- **Day 2: Core UI Components**
-    - Built specific Dashboard layout and Sidebar navigation.
-    - Designed the "Snippet Card" component.
-    - Implemented responsiveness basics.
+This project was built in an intense 7-day sprint to go from idea to polished product.
 
-- **Day 3: Database & CRUD**
-    - Integrated Firestore for data persistence.
-    - Created `storage.js` service for standardized DB operations.
-    - Implemented "My Snippets" list view with real-time updates.
+- **Day 1: Foundation & Auth**
+  - Project initialization with Vite + React.
+  - Implemented Firebase Authentication (Google/GitHub).
+  - Designed the core data schema in Firestore.
 
-- **Day 4: AI Integration & Theme**
-    - Integrated Groq API for generating metadata (tags, titles) and detailed study notes.
-    - Applied the "Modern Dark SaaS" theme (Day 4 Styles).
-    - Refined UI consistency across Auth and Dashboard pages.
+- **Day 2: Core Storage Engine**
+  - Built robust Firestore utilities for CRUD operations.
+  - Implemented `utils/storage.js` with optimistic UI updates.
+  - Created the initial "Add Snippet" flow.
 
-- **Day 5: Code Visualizer**
-    - Developed the custom AST-based interpreter for Java/C++.
-    - Built the Visualizer Modal with step-by-step execution controls.
-    - Implemented variable state tracking and array visualization.
+- **Day 3: AI Integration (Gemini/Groq)**
+  - Integrated Large Language Models to analyze code.
+  - Implemented automatic metadata generation (Title, Topic, Tags).
+  - Built the "AI Explain" feature to generate detailed code notes.
 
-- **Day 6: Testing & Refinement**
-    - Refactored Visualizer logic into specific utilities.
-    - Added unit tests for the interpreter.
-    - Fixed edge cases in C++ vector parsing.
+- **Day 4: The Dark Dashboard**
+  - Complete UI overhaul to a professional "Dark Mode" aesthetic.
+  - Designed the 3-pane dashboard layout (Sidebar, List, Detail).
+  - Implemented the sticky top bar and responsive grid.
 
-- **Day 7: Recall Mode V1**
-    - Implemented the Spaced Repetition algorithm foundation.
-    - Created the Recall Mode UI with "Reveal Code" interaction.
-    - Set up the review loop (Understood/Revisit).
+- **Day 5: Robustness & Fallbacks**
+  - Implemented `utils/groq.js` with a cascading API key fallback system.
+  - Added request timeouts and error handling for reliable AI performance.
+  - Refined the "Recall Mode" logic for active learning sessions.
 
-- **Day 8: Production Polish (Current)**
-    - **Recall Algorithm V2**: Refined scoring to prioritize "hard" and "new" items correctly.
-    - **Stability**: Added guards to prevent AI note regeneration.
-    - **UX**: Added "Missing Notes" CTA and restricted Visualizer to supported languages.
-    - **Cleanup**: Removed debug logs and finalized branding.
+- **Day 6: Algorithm Visualizer**
+  - Built the `CodeVisualizer` engine to parse and step through code.
+  - Added AI-generated test inputs for dynamic visualization.
+  - Focused on visualizing Java and C++ pointer/array logic.
 
-## 📦 Installation
+- **Day 7: Productization & Polish**
+  - Final UI consistency sweep (Padding, Radius, Colors).
+  - Mobile optimization for all views.
+  - Added logo/branding execution.
+  - Prepared for strict "Launch Day" stability checks.
 
-1. Clone the repository.
-2. Install dependencies:
+## 🚀 Setup & Run
+
+1. **Clone the repo**
+   ```bash
+   git clone https://github.com/DeeKush/Code-Recall.git
+   cd Code-Recall
+   ```
+
+2. **Install Dependencies**
    ```bash
    npm install
    ```
-3. Set up `.env` with your API keys:
+
+3. **Configure Environment**
+   Create a `.env` file with your keys:
    ```env
    VITE_FIREBASE_API_KEY=...
    VITE_GROQ_API_KEY=...
    ```
-4. Run locally:
+
+4. **Run Locally**
    ```bash
    npm run dev
    ```
 
-## 🔮 Future Roadmap
+5. **Build for Production**
+   ```bash
+   npm run build
+   ```
 
-- [ ] Support for Python visualization.
-- [ ] Mobile-responsive visualizer.
-- [ ] Community snippet sharing.
+## 📄 License
+MIT

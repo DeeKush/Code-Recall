@@ -42,7 +42,7 @@ function withTimeout(promise, ms) {
  */
 export async function getSnippets(userId) {
     // DEBUG: Log the user ID
-    console.log("[DEBUG] getSnippets called with userId:", userId);
+
 
     try {
         // Reference to this user's snippets collection
@@ -53,9 +53,8 @@ export async function getSnippets(userId) {
         const q = query(snippetsRef, orderBy("createdAt", "desc"));
 
         // Fetch the documents
-        console.log("[DEBUG] Fetching documents from Firestore...");
+        // Fetch the documents
         const querySnapshot = await getDocs(q);
-        console.log("[DEBUG] Documents fetched, count:", querySnapshot.size);
 
         // Convert Firestore documents to plain JavaScript objects
         const snippets = [];
@@ -66,7 +65,7 @@ export async function getSnippets(userId) {
             });
         });
 
-        console.log("[DEBUG] Snippets loaded:", snippets);
+
         return snippets;
     } catch (error) {
         console.error("[ERROR] Error fetching snippets:", error);
@@ -84,8 +83,6 @@ export async function getSnippets(userId) {
  */
 export async function saveSnippet(userId, snippet) {
     // DEBUG: Log save attempt
-    console.log("[DEBUG] saveSnippet called with userId:", userId);
-    console.log("[DEBUG] Snippet data to save:", snippet);
 
     try {
         // Create a readable date string like "2026-02-08 19:42"
@@ -154,7 +151,7 @@ function formatDate(date) {
  * @returns {Promise<Object>} - The AI data that was saved
  */
 export async function updateSnippetAI(userId, snippetId, aiData, status) {
-    console.log("[DEBUG] updateSnippetAI called for snippet:", snippetId);
+
 
     try {
         // Reference to the specific snippet document
@@ -170,12 +167,12 @@ export async function updateSnippetAI(userId, snippetId, aiData, status) {
             aiModel: "llama3-70b-8192"
         };
 
-        console.log("[DEBUG] Updating with AI data:", updateData);
+
 
         // Update the document with timeout
         await withTimeout(updateDoc(snippetRef, updateData), 10000);
 
-        console.log("[DEBUG] AI data saved successfully!");
+
 
         return updateData;
     } catch (error) {
@@ -257,7 +254,7 @@ export async function updateSnippetRecall(userId, snippetId, isUnderstood) {
 
         // 3. Update
         await updateDoc(snippetRef, updatePayload);
-        console.log(`[RECALL] Updated snippet ${snippetId}: ${feedbackType} (Streak: ${newStreak})`);
+
 
     } catch (error) {
         console.error("Error updating recall stats:", error);

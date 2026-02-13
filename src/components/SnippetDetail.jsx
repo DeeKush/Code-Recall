@@ -20,6 +20,7 @@ import {
     RefreshCw,
     ChevronDown,
     ChevronRight,
+    ChevronLeft,
     Target,
     Lightbulb,
     Wrench,
@@ -75,7 +76,7 @@ function AccordionSection({ title, description, icon: Icon, children, defaultOpe
     );
 }
 
-function SnippetDetail({ snippet, notesStatus, onRetryNotes, onUpdate, onDelete }) {
+function SnippetDetail({ snippet, notesStatus, onRetryNotes, onUpdate, onDelete, onBack }) {
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState("details");
 
@@ -310,6 +311,11 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes, onUpdate, onDelete 
     if (!snippet) {
         return (
             <div className="detail-empty">
+                {onBack && (
+                    <button className="mobile-back-btn" onClick={onBack}>
+                        <ChevronLeft size={20} /> Back to List
+                    </button>
+                )}
                 <FileCode size={56} className="empty-icon" />
                 <p className="empty-title">No snippet selected</p>
                 <p className="empty-subtitle">Select a snippet from the list to view its code and AI notes</p>
@@ -342,6 +348,11 @@ function SnippetDetail({ snippet, notesStatus, onRetryNotes, onUpdate, onDelete 
                 <section className="detail-code-section">
                     <div className="code-panel-header">
                         <div className="code-title-row">
+                            {onBack && (
+                                <button className="mobile-back-btn-icon" onClick={onBack}>
+                                    <ChevronLeft size={20} />
+                                </button>
+                            )}
                             <FileCode size={18} className="code-title-icon" />
                             {isEditing ? (
                                 <input

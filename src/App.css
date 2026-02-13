@@ -4201,6 +4201,29 @@ textarea:focus-visible,
   min-height: calc(100vh - 60px);
 }
 
+@media (max-width: 900px) {
+  .hero-section {
+    grid-template-columns: 1fr;
+    text-align: center;
+    padding: 2rem 1.5rem;
+    height: auto;
+    min-height: auto;
+  }
+
+  .hero-buttons {
+    justify-content: center;
+  }
+
+  .hero-subtitle {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hero-preview {
+    margin-top: 2rem;
+  }
+}
+
 .hero-title {
   font-size: 3rem;
   font-weight: 700;
@@ -4683,7 +4706,7 @@ textarea:focus-visible,
   font-weight: 600;
   font-size: 0.95rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all var(--transition-fast);
   width: 100%;
@@ -4800,6 +4823,27 @@ textarea:focus-visible,
   height: 100%;
   overflow: hidden;
   background-color: var(--bg-primary);
+}
+
+@media (max-width: 900px) {
+  .recall-page {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    overflow-y: auto;
+    height: 100vh;
+  }
+
+  .recall-queue-panel {
+    max-height: 220px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .recall-workspace {
+    min-height: 60vh;
+    overflow-y: visible;
+    height: auto;
+  }
 }
 
 /* LEFT: Queue Panel */
@@ -5014,7 +5058,7 @@ textarea:focus-visible,
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 2rem;
-  border-radius: 12px;
+  border-radius: 10px;
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
@@ -5310,16 +5354,18 @@ textarea:focus-visible,
 }
 
 /* 2. Main Layout (40/60) */
+/* 2. Main Layout (60/40) */
 .home-main-layout {
   display: grid;
-  grid-template-columns: 2fr 3fr;
+  grid-template-columns: 3fr 2fr;
   gap: 20px;
   align-items: start;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   .home-main-layout {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 }
 
@@ -5354,6 +5400,12 @@ textarea:focus-visible,
   flex-direction: column;
   height: 100%;
   min-height: 400px;
+}
+
+.create-left-panel textarea,
+.create-left-panel .std-textarea {
+  min-height: 380px;
+  max-height: 520px;
 }
 
 .panel-header-small {
@@ -5895,4 +5947,102 @@ textarea:focus-visible,
 .recent-label svg,
 .panel-header-small svg {
   stroke-width: 2px;
+}
+
+/* ==========================================
+   MOBILE DASHBOARD LAYOUT (Responsive Fix)
+   ========================================== */
+@media (max-width: 900px) {
+  .dashboard-content {
+    display: block;
+    /* Use block flow instead of grid */
+    position: relative;
+    height: calc(100vh - var(--topbar-height));
+    overflow: hidden;
+  }
+
+  .pane {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto;
+  }
+
+  /* List Pane: Hidden when detail is active */
+  .pane-list.mobile-hidden {
+    display: none;
+  }
+
+  .pane-list {
+    width: 100%;
+    border-right: none;
+    display: block;
+    background-color: var(--bg-primary);
+    /* Ensure background */
+  }
+
+  /* Detail Pane: Hidden by default on mobile, shown when active */
+  .pane-detail {
+    display: none;
+    width: 100%;
+    position: fixed;
+    top: var(--topbar-height);
+    left: 0;
+    height: calc(100vh - var(--topbar-height));
+    z-index: 20;
+    background-color: var(--bg-primary);
+    overflow-y: auto;
+  }
+
+  .pane-detail.mobile-visible {
+    display: block;
+  }
+
+  /* Mobile Back Buttons */
+  .mobile-back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    width: 100%;
+    background-color: var(--bg-elevated);
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .mobile-back-btn-icon {
+    display: flex;
+    /* Visible on mobile */
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    margin-right: 0.5rem;
+    padding: 0.25rem;
+  }
+
+  .detail-header-top {
+    align-items: center;
+  }
+}
+
+@media (min-width: 901px) {
+
+  .mobile-back-btn,
+  .mobile-back-btn-icon {
+    display: none !important;
+    /* Always hide on desktop */
+  }
+
+  .pane-list,
+  .pane-detail {
+    display: block !important;
+    /* Force show on desktop */
+  }
 }

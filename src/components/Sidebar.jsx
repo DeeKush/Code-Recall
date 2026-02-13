@@ -8,14 +8,19 @@
 //   - Collapsible on mobile
 // ==========================================
 
+import { useNavigate } from "react-router-dom";
 import {
-    LayoutDashboard,
+    Home,
+    Code,
+    Zap,
+    BarChart2,
+    Settings as SettingsIcon,
+    LogOut,
+    X,
+    Menu,
     Code2,
     Sparkles,
-    Settings,
-    Menu,
-    X,
-    Home
+    LayoutDashboard
 } from "lucide-react";
 import logo from "../assets/logo.png";
 
@@ -44,7 +49,8 @@ function Sidebar({ activeSection = "dashboard", onSectionChange, isOpen, onToggl
                 {/* Logo section */}
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
-                        <img src={logo} alt="CodeRecall" className="logo-image" style={{ height: '45px', width: 'auto' }} />
+                        <img src={logo} alt="CodeRecall" className="logo-img-sidebar" style={{ height: '32px', width: 'auto' }} />
+                        <span className="logo-text">CodeRecall</span>
                     </div>
                     <button
                         className="sidebar-close"

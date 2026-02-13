@@ -189,7 +189,7 @@ function Dashboard() {
         setNotesStatus(prev => ({ ...prev, [savedSnippet.id]: "generating" }));
 
         try {
-            console.log("[DASHBOARD] Generating notes...");
+
             const notesData = await generateSnippetNotes(
                 snippetData.code,
                 snippetData.title,
@@ -213,7 +213,7 @@ function Dashboard() {
             );
 
             setNotesStatus(prev => ({ ...prev, [savedSnippet.id]: "done" }));
-            console.log("[DASHBOARD] Notes saved!");
+
 
         } catch (error) {
             console.error("[DASHBOARD] Notes failed:", error.message);
@@ -239,9 +239,16 @@ function Dashboard() {
         return savedSnippet.id;
     }
 
+    const [showMobileDetail, setShowMobileDetail] = useState(false);
+
     // Select a snippet
     function handleSelectSnippet(snippet) {
         setSelectedSnippet(snippet);
+        setShowMobileDetail(true);
+    }
+
+    function handleBackToMobileList() {
+        setShowMobileDetail(false);
     }
 
     // Retry notes generation
@@ -369,6 +376,7 @@ function Dashboard() {
                         <RecallMode
                             snippets={snippets}
                             onNavigate={handleSectionChange}
+                            onUpdate={handleSnippetUpdate}
                         />
                     </main>
                 );
@@ -383,7 +391,8 @@ function Dashboard() {
                 return (
                     <main className="dashboard-content">
                         {/* Left pane - Snippet list */}
-                        <section className="pane pane-list">
+                        {/* Left pane - Snippet list */}
+                        <section className={`pane pane-list ${showMobileDetail ? 'mobile-hidden' : ''}`}>
                             <div className="pane-header">
                                 <h2>Your Snippets</h2>
                                 <span className="snippet-count">{filteredSnippets.length}</span>
@@ -400,13 +409,14 @@ function Dashboard() {
                         </section>
 
                         {/* Right pane - Snippet detail */}
-                        <section className="pane pane-detail">
+                        <section className={`pane pane-detail ${showMobileDetail ? 'mobile-visible' : ''}`}>
                             <SnippetDetail
                                 snippet={selectedSnippet}
                                 notesStatus={selectedSnippet ? (notesStatus[selectedSnippet.id] || "idle") : "idle"}
                                 onRetryNotes={handleRetryNotes}
                                 onUpdate={handleSnippetUpdate}
                                 onDelete={handleSnippetDelete}
+                                onBack={handleBackToMobileList}
                             />
                         </section>
                     </main>

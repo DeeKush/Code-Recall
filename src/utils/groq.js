@@ -117,7 +117,7 @@ async function callAI(messages) {
     // 1. Try each Groq key
     for (let i = 0; i < GROQ_KEYS.length; i++) {
         try {
-            // console.log(`[AI] Trying Groq key ${i + 1}/${GROQ_KEYS.length}...`);
+
             return await callGroqWithKey(messages, GROQ_KEYS[i]);
         } catch (err) {
             console.warn(`[AI] Groq key ${i + 1} failed: ${err.message}`);
@@ -128,7 +128,7 @@ async function callAI(messages) {
     // 2. Try OpenRouter
     if (OPENROUTER_KEY) {
         try {
-            console.log("[AI] All Groq keys failed. Trying OpenRouter...");
+
             return await callOpenRouter(messages);
         } catch (err) {
             console.warn(`[AI] OpenRouter failed: ${err.message}`);
@@ -227,7 +227,7 @@ export async function generateVisualizerInputs(code, language = "java") {
         ]);
         return result.inputs || null;
     } catch (err) {
-        console.warn("[AI] Failed to generate inputs:", err);
+
         return null;
     }
 }
