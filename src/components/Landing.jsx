@@ -8,7 +8,7 @@
 // ==========================================
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
-import { ArrowRight, Code, Zap, BarChart, CheckCircle, Smartphone, Globe, Shield, Star, Github, Code2 } from "lucide-react";
+import { ArrowRight, Code, Zap, BarChart, CheckCircle, Smartphone, Globe, Shield, Star, Github, Code2, Sparkles } from "lucide-react";
 
 function Landing({ onGetStarted, onLogin }) {
     const features = [
