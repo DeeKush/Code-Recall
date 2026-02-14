@@ -39,7 +39,7 @@ function Landing({ onGetStarted, onLogin }) {
             {/* Navigation */}
             <nav className="landing-nav">
                 <div className="nav-logo">
-                    <img src={logo} alt="CodeRecall" style={{ height: '36px', width: 'auto' }} />
+                    <img src={logo} alt="CodeRecall" style={{ height: '36px', width: '36px', objectFit: 'cover', objectPosition: 'left center' }} />
                     <span>CodeRecall</span>
                 </div>
                 <div className="nav-links">
