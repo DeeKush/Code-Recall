@@ -1,54 +1,61 @@
-# CodeRecall
+# CodeRecall 📖
 
-CodeRecall is a developer learning platform that helps programmers retain technical knowledge using spaced repetition and AI-generated explanations. Most developers solve complex bugs only to forget the specific patterns weeks later; this tool centralizes those solutions and schedules them for revision to ensure long-term mastery. By integrating the Groq API (Llama 3), it provides instant conceptual clarity, transforming a simple snippet list into an active recall study system.
+CodeRecall is a developer learning platform that helps programmers retain technical knowledge using spaced repetition and AI-generated explanations. Most developers solve complex bugs only to forget the specific patterns weeks later; this tool centralizes those solutions and schedules them for revision to ensure long-term mastery.
 
-Unlike traditional snippet managers, CodeRecall actively schedules revision sessions instead of passively storing code.
+[Overview](#coderecall-) · [Features](#-features) · [Tech Stack](#-tech-stack) · [Architecture](#-architecture) · [Routing](#-routing-architecture) · [Recall Mode](#-recall-mode-logic) · [AI Integration](#-ai-integration) · [Setup](#-setup-instructions) · [Future Work](#-future-improvements)
 
-## Project Objective
+## Why CodeRecall is different
 
-The goal of CodeRecall is to optimize developer productivity by applying learning science to code management. It uses a priority-based spaced repetition algorithm to ensure developers revisit their most difficult snippets at the right time, while AI explanations bridge the gap between "working code" and "conceptual understanding."
+Standard snippet managers act as passive storage for code, often leading to a "save and forget" cycle. In contrast, CodeRecall applies learning science to developer productivity:
+- **Active Scheduling**: Instead of just storing code, it schedules revision sessions based on performance.
+- **AI Reinforcement**: Integrated AI explanations provide conceptual "why" behind the "how," strengthening retention.
+- **Priority Logic**: A weighted queue ensures your weakest areas are resurfaced more frequently.
 
-## Problem Statement
+## How CodeRecall works
 
-Developers often forget solutions they have already implemented, leading to redundant work and "re-googling" the same bugs. Standard notes are often scattered across Gists, bookmarks, or Notion, making revision inefficient and uncoordinated. CodeRecall addresses this by providing an intelligent, scheduled practice environment that automates technical revision.
+**Save snippet** → **Generate explanation** → **Practice recall** → **Track progress**
 
-## Features
+---
 
-- **Authentication**: Firebase-powered login and signup with protected dashboard routes.
-- **Snippet Workspace**: Full CRUD engine to save, edit, and organize snippets with syntax highlighting.
-- **Recall Mode**: Intelligent learning queue that prioritizes snippets based on past performance.
-- **AI Explanation Engine**: Near-instant breakdown of code logic using the Groq (Llama 3) model.
-- **Analytics Dashboard**: Visual progress tracking including learning streaks and category mastery.
+## ✨ Features
 
-## How CodeRecall Works (Quick Flow)
+### Authentication
+- **Secure Access**: Firebase-powered login and signup identity management.
+- **Protected Environment**: Navigation guards ensure data privacy and session security.
 
-Save snippet → Generate AI explanation → Practice in Recall Mode → Track progress in Analytics
+### Snippet Workspace
+- **Dynamic CRUD**: Comprehensive engine to save, edit, and organize snippets with full syntax highlighting.
+- **Instant Retrieval**: Unified search bar and language-based categorization for fast access.
 
-## Tech Stack
+### Recall Mode
+- **Intelligent Queue**: A priority-based learner that resurfaces snippets at optimal intervals.
+- **Feedback Reinforcement**: Update snippet mastery levels (Mastered/Revisit) to adjust scheduling scores.
 
-### Frontend
-- React
-- React Router v6
-- Vite
+### AI Explanation Engine
+- **Conceptual Clarity**: Near-instant breakdown of complex logic using High-Speed Llama 3 models.
+- **Contextual Support**: Structured notes rendered directly inside the workspace for reference during study.
 
-### Backend / Services
-- Firebase Authentication
-- Firestore (NoSQL Database)
-- Groq AI API (Llama 3)
+### Analytics Dashboard
+- **Performance Insights**: Visual tracking of learning streaks and total snippet mastery.
+- **Knowledge Mapping**: Category-wise priority distribution to identify learning gaps.
 
-## Architecture Summary
+---
 
-The project follows a modular React architecture using pages, services, hooks, and reusable components to separate UI from business logic.
+## 🛠️ Tech Stack
 
-## Project Structure
+| Layer | Technology |
+| :--- | :--- |
+| **Frontend** | React, Vite |
+| **Routing** | React Router v6 |
+| **Backend** | Firebase Auth + Firestore |
+| **AI** | Groq (Llama 3) |
+| **Architecture** | Custom Hooks + Services Layer |
 
-- **src/pages**: Route-level components for views like Landing, Login, and Dashboard.
-- **src/components**: Feature-specific UI modules (Workspace, Recall Queue).
-- **src/components/common**: Generic elements like loaders and the ErrorBoundary.
-- **src/hooks**: Stateful logic abstractions (e.g., `useSnippetAI`, `useAuthListener`).
-- **src/services**: Infrastructure layer for Firebase and Groq operations.
+---
 
-The architecture separates infrastructure logic from UI rendering using services and custom hooks.
+## 🧱 Architecture
+
+The architecture separates infrastructure logic from UI rendering using a modular services and custom hooks pattern.
 
 ### Architecture Flow
 ```mermaid
@@ -59,22 +66,29 @@ graph LR
     D --> E[UI Components]
 ```
 
-## Routing Architecture
+**Design Decisions:**
+- **Services Layer**: Isolates external API logic (Firebase/Groq) for easy future provider migration.
+- **Custom Hooks**: Encapsulates stateful business logic, keeping UI components pure and reusable.
+- **Directory Structure**: Clear separation between `/pages` (routes) and `/components` (UI modules).
 
-CodeRecall uses **React Router v6** for deep-link persistent navigation and route guarding.
-- **Nested Dashboard Routes**: Users can switch between workspace sections without reloading the page.
-    - `/dashboard/snippets` - Workspace
-    - `/dashboard/recall` - Study Mode
-    - `/dashboard/analytics` - Insights
-    - `/dashboard/settings` - Config
-- **ProtectedRoute**: A higher-order component that checks the Firebase auth state before granting access to the dashboard.
+---
 
-## Recall Mode Logic
+## 🧭 Routing Architecture
 
-The Recall Scheduler uses a priority-based logic to optimize retention:
-- **Priority Queue**: Snippets are resurfaced based on their "Recall Priority" score.
-- **Feedback Loop**: When a user marks a snippet as "Mastered," its priority drops; if marked "Revisit," it is moved to the front.
-- **Spaced Repetition**: Weak snippets appear more frequently, while strong snippets are spaced further apart to challenge long-term memory.
+CodeRecall utilizes **React Router v6** for deep-link persistent navigation and authenticated guarding.
+
+- **Nested Routing**: Sub-views are managed within the dashboard for a seamless UX without full page reloads.
+    - `/dashboard/snippets` (Workspace)
+    - `/dashboard/recall` (Study)
+    - `/dashboard/analytics` (Insights)
+    - `/dashboard/settings` (Config)
+- **ProtectedRoute**: A higher-order component logic that validates auth state before rendering restricted views.
+
+---
+
+## 🧠 Recall Mode Logic
+
+The Recall Scheduler uses a priority-based logic to optimize knowledge retention through active reinforcement.
 
 ### System Flow Diagram
 ```mermaid
@@ -86,12 +100,15 @@ graph TD
     Dashboard -->|Aggregates| Analytics
 ```
 
-## AI Integration
+**Internal Logic:**
+- **Priority-Based Resurfacing**: Snippets with low "streak" or high "revisit" counts are prioritized.
+- **Spaced Spacing**: Mastered snippets appear less often, while weak snippets are surfaced more frequently to challenge memory.
 
-AI explanations are integrated directly into the study workflow to improve code comprehension.
-- **Groq API**: Uses Llama 3 for low-latency code analysis.
-- **useSnippetAI**: A custom hook that isolates API communication from the UI.
-- **Contextual Notes**: Results are rendered inside an accordion for easy reference during study.
+---
+
+## 🤖 AI Integration
+
+AI explanations are integrated into the study workflow to bridge code implementation and conceptual understanding.
 
 ### AI Pipeline Diagram
 ```mermaid
@@ -101,35 +118,55 @@ graph LR
     Hook --> Display[Workspace Display]
 ```
 
-## Performance Optimizations
+- **Groq Integration**: Leverages low-latency Llama 3 for instant analytical feedback.
+- **Logic Isolation**: The `useSnippetAI` hook handles all asynchronous states and error handling for the UI.
 
-- **Lazy Loading**: Route-splitting via `React.lazy` to keep the initial bundle small.
-- **Suspense**: A centralized loader handles the UI state during route transitions.
-- **Memoization**: `useMemo` and `useCallback` prevent redundant calculations and re-renders in the complex dashboard workspace.
+---
 
-## Screenshots
+## ⚡ Performance
 
-- **Dashboard Workspace View**: [Placeholder: Grid of snippets with filters]
-- **Recall Mode Interface**: [Placeholder: Learning queue with priority cards]
-- **Analytics Panel**: [Placeholder: Activity graphs and streaks]
+- **Lazy Loading**: Route-based splitting using `React.lazy` to minimize initial bundle size.
+- **Suspense**: Centralized loading state management during route transitions.
+- **Memoization**: Heavy sorting and filtering logic optimized via `useMemo` and `useCallback`.
+- **Stability**: `ErrorBoundary` wrapping the main dashboard to prevent total application failure.
 
-## Setup Instructions
+---
 
-Ensure you have a Firebase project (with Firestore and Auth enabled) and a Groq API key before starting.
+## 📸 Screenshots
 
-1. Clone the repository.
-2. `npm install`
-3. Create a `.env` file based on `.env.example`.
-4. Add your Firebase config and Groq API key to `.env`.
-5. `npm run dev`
+- **Dashboard Workspace**: *[Placeholder: Grid of snippets with language filters]*
+- **Recall Mode**: *[Placeholder: Priority-based learning cards]*
+- **Analytics View**: *[Placeholder: Learning progress and streak tracking]*
 
-## Future Improvements
+---
 
-- **Offline Caching**: Support for snippet review without internet.
-- **Collaborative Decks**: Peer-to-peer sharing of snippet collections.
-- **Mobile Optimization**: Progressive Web App (PWA) support.
-- **Adaptive Scoring**: Finer-grained priority weights based on review speed.
+## 🚀 Setup Instructions
 
-## Author Note
+1. **Clone & Install**:
+   ```bash
+   git clone https://github.com/DeeKush/Code-Recall.git
+   npm install
+   ```
+2. **Environment Configuration**:
+   - Create a `.env` file based on `.env.example`.
+   - Configure Firebase project (Firestore + Auth enabled).
+   - Add Groq API Key for AI features.
+3. **Run Locally**:
+   ```bash
+   npm run dev
+   ```
+
+---
+
+## 🔮 Future Improvements
+
+- **Offline Support**: PWA with Service Worker integration for offline snippet review.
+- **Collaborative Features**: Shared snippet "decks" for peer learning teams.
+- **Mobile Experience**: Optimized mobile-first touch UI for "on-the-go" recall.
+- **Advanced Scoring**: Implementation of SM-2 algorithm for precise scheduling.
+
+---
+
+## 📄 Author Note
 
 This project was developed as part of a React end-term submission focused on applying learning science concepts to frontend architecture design.
