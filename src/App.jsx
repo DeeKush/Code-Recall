@@ -1,96 +1,76 @@
-// ==========================================
-// MAIN APP COMPONENT (Day 4 - Dark Dashboard)
-// ==========================================
-// Routes between:
-//   - Home (landing page)
-//   - Login / Signup
-//   - Dashboard
-// ==========================================
-
-import { useState, useEffect } from "react";
-import { AuthProvider, useAuth } from "./context/AuthContext";
-import Landing from "./components/Landing";
-import Login from "./components/Login";
-import Signup from "./components/Signup";
-import Dashboard from "./components/Dashboard";
-import ErrorBoundary from "./components/ErrorBoundary";
+import React, { Suspense, lazy } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import ErrorBoundary from "./components/common/ErrorBoundary";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import Loading from "./components/common/Loading";
 import "./App.css";
 
-// Inner component that uses auth context
-function AppContent() {
-  // Get auth state from context
-  const { user, loading } = useAuth();
+// Lazy load pages for performance and academic best practices
+const Landing = lazy(() => import("./pages/Landing"));
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 
-  // State for navigation
-  const [currentPage, setCurrentPage] = useState("landing"); // landing, login, signup
-
-  // Auth Protection & Direct URL Handling
-  useEffect(() => {
-    const path = window.location.pathname;
-
-    // If not logged in and trying to access protected route -> redirect to login (or landing)
-    // Protected routes: /dashboard, /snippets, /recall, /home, /settings
-    // Public routes: /, /login, /signup
-    const isProtected = ["/dashboard", "/snippets", "/recall", "/home", "/settings"].some(p => path.startsWith(p));
-
-    if (!loading && !user && isProtected) {
-      // Force to landing or login
-      window.history.replaceState(null, "", "/");
-      setCurrentPage("landing");
-    }
-  }, [user, loading]);
-
-  // Show loading screen while checking auth status
-  if (loading) {
-    return (
-      <div className="loading-screen-dark">
-        <div className="loading-spinner"></div>
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  // If user is logged in, show the Dashboard
-  // Dashboard handles its own internal routing (home, snippets, recall, etc.)
-  if (user) {
-    return <Dashboard />;
-  }
-
-  // Show appropriate public page based on state
-  switch (currentPage) {
-    case "login":
-      return (
-        <Login
-          onSwitchToSignup={() => setCurrentPage("signup")}
-          onBackToHome={() => setCurrentPage("landing")}
-        />
-      );
-    case "signup":
-      return (
-        <Signup
-          onSwitchToLogin={() => setCurrentPage("login")}
-          onBackToHome={() => setCurrentPage("landing")}
-        />
-      );
-    default:
-      return (
-        <Landing
-          onGetStarted={() => setCurrentPage("signup")}
-          onLogin={() => setCurrentPage("login")}
-        />
-      );
-  }
-}
-
-// Main App component wraps everything in AuthProvider and ErrorBoundary
 function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppContent />
+        <BrowserRouter>
+          <Suspense fallback={<Loading />}>
+            <Routes>
+              {/* Public Routes */}
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute authenticationRequired={false} guestOnly={true}>
+                    <Landing />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/login" 
+                element={
+                  <ProtectedRoute authenticationRequired={false} guestOnly={true}>
+                    <Login />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/signup" 
+                element={
+                  <ProtectedRoute authenticationRequired={false} guestOnly={true}>
+                    <Signup />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Protected Dashboard Routes */}
+              {/* Note: Nested routes handled within Dashboard.jsx */}
+              <Route 
+                path="/dashboard/*" 
+                element={
+                  <ProtectedRoute>
+                    <ErrorBoundary>
+                      <Dashboard />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Fallback Redirects */}
+              <Route path="/home" element={<Navigate to="/" replace />} />
+              <Route path="/recall" element={<Navigate to="/dashboard/recall" replace />} />
+              <Route path="/snippets" element={<Navigate to="/dashboard/snippets" replace />} />
+              <Route path="/settings" element={<Navigate to="/dashboard/settings" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
       </AuthProvider>
     </ErrorBoundary>
   );
 }
 
 export default App;
+
