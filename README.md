@@ -132,11 +132,27 @@ graph LR
 
 ---
 
-## 📸 Screenshots
+## 📸 Application Screenshots
 
-- **Dashboard Workspace**: *[Placeholder: Grid of snippets with language filters]*
-- **Recall Mode**: *[Placeholder: Priority-based learning cards]*
-- **Analytics View**: *[Placeholder: Learning progress and streak tracking]*
+| Landing Page                        | Dashboard Workspace                   |
+| ----------------------------------- | ------------------------------------- |
+| ![](assets/screenshots/landing.png) | ![](assets/screenshots/dashboard.png) |
+
+| Recall Mode                             | Analytics View                        |
+| --------------------------------------- | ------------------------------------- |
+| ![](assets/screenshots/recall-mode.png) | ![](assets/screenshots/analytics.png) |
+
+### Landing Page
+Introduces the platform and highlights the AI-assisted recall workflow.
+
+### Dashboard Workspace
+Central snippet storage and preview interface with filtering support.
+
+### Recall Mode
+Priority-based learning queue powered by spaced repetition logic.
+
+### Analytics View
+Displays snippet activity insights and revision progress tracking.
 
 ---
 
