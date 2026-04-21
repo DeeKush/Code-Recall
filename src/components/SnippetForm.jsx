@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { Code, Sparkles, FileText, Tag, Loader, Check, X, Plus, AlertCircle } from "lucide-react";
-import { generateSnippetMetadata } from "../utils/groq";
+import { generateSnippetMetadata } from "../services/groqService";
 
 function SnippetForm({
     code,

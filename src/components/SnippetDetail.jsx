@@ -1,16 +1,8 @@
-// ==========================================
-// SNIPPET DETAIL COMPONENT (Day 4 + Day 6)
-// ==========================================
-// Split view with:
-//   - Top: Code editor panel
-//   - Bottom: Tabs (Details | AI Notes)
-//   - Visualize opens in a fullscreen modal
-// ==========================================
-
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import { visualizeSnippet } from "../utils/visualizer";
-import { generateVisualizerInputs } from "../utils/groq";
+import { generateVisualizerInputs } from "../services/groqService";
 import {
     Copy,
     Check,
@@ -44,7 +36,9 @@ import {
     Trash2
 } from "lucide-react";
 
-// Collapsible accordion component with description
+/**
+ * Collapsible accordion component with description.
+ */
 function AccordionSection({ title, description, icon: Icon, children, defaultOpen = false }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
@@ -76,20 +70,24 @@ function AccordionSection({ title, description, icon: Icon, children, defaultOpe
     );
 }
 
+/**
+ * SnippetDetail - Visualizer & Management workspace.
+ * Decomposed from monolithic view and optimized for performance.
+ */
 function SnippetDetail({ snippet, notesStatus, onRetryNotes, onUpdate, onDelete, onBack }) {
+    const [searchParams] = useSearchParams();
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState("details");
 
     // Sync tab with URL param if present
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const tabParam = params.get("tab");
+        const tabParam = searchParams.get("tab");
         if (tabParam === "visualize") {
             setActiveTab("visualize");
         } else if (tabParam === "ai-notes") {
             setActiveTab("ai-notes");
         }
-    }, [snippet]); // Re-check when snippet changes (or on mount)
+    }, [snippet, searchParams]);
 
     // Scroll to top when snippet changes
     const topRef = useRef(null);
