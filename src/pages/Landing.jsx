@@ -1,16 +1,14 @@
-// ==========================================
-// HOME PAGE COMPONENT (Day 4 - Landing Page)
-// ==========================================
-// Public landing page with:
-//   - Dark themed hero section
-//   - CTA buttons for Get Started / Login
-//   - Feature highlights
-// ==========================================
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { ArrowRight, Code, Zap, BarChart, CheckCircle, Smartphone, Globe, Shield, Star, Github, Code2, Sparkles, BookOpen } from "lucide-react";
 
-function Landing({ onGetStarted, onLogin }) {
+/**
+ * Landing Component - Public landing page.
+ * Refactored for React Router v6.
+ */
+function Landing() {
+    const navigate = useNavigate();
+
     const features = [
         {
             icon: Code2,
@@ -34,6 +32,9 @@ function Landing({ onGetStarted, onLogin }) {
         }
     ];
 
+    const handleLogin = () => navigate("/login");
+    const handleSignup = () => navigate("/signup");
+
     return (
         <div className="home-page">
             {/* Navigation */}
@@ -43,7 +44,7 @@ function Landing({ onGetStarted, onLogin }) {
                     <span>CodeRecall</span>
                 </div>
                 <div className="nav-links">
-                    <button onClick={onLogin} className="btn-nav-login">
+                    <button onClick={handleLogin} className="btn-nav-login">
                         Login
                     </button>
                 </div>
@@ -65,11 +66,11 @@ function Landing({ onGetStarted, onLogin }) {
                         Built for DSA practice, competitive programming, and interview prep.
                     </p>
                     <div className="hero-buttons">
-                        <button onClick={onGetStarted} className="btn-hero-primary">
+                        <button onClick={handleSignup} className="btn-hero-primary">
                             Get Started
                             <ArrowRight size={20} />
                         </button>
-                        <button onClick={onLogin} className="btn-hero-secondary">
+                        <button onClick={handleLogin} className="btn-hero-secondary">
                             Login
                         </button>
                     </div>
@@ -133,3 +134,4 @@ function Landing({ onGetStarted, onLogin }) {
 }
 
 export default Landing;
+
