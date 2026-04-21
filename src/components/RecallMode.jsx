@@ -1,98 +1,31 @@
-// ==========================================
-// RECALL MODE COMPONENT (Day 7 - Spaced Repetition V2)
-// ==========================================
-// The primary learning engine with Spaced Repetition Logic.
-// V2 Features: Strict Layout, Date-Aware Algo, Session Boundary.
-// ==========================================
-
-import { useState, useMemo, useEffect } from "react";
-import ReactMarkdown from "react-markdown";
-import { Sparkles, BookOpen, ChevronDown, ChevronRight, Info, Eye, EyeOff, CheckCircle, RotateCcw, Lock, Trophy, Clock, AlertCircle, Zap, Target, AlertTriangle, Monitor, HardDrive, RefreshCw } from "lucide-react";
-import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { Info, CheckCircle } from "lucide-react";
 import { updateSnippetRecall, updateSnippetAI } from "../utils/storage";
-import { generateSnippetNotes } from "../utils/groq";
+import { generateSnippetNotes } from "../services/groqService";
 import { useAuth } from "../context/AuthContext";
+import RecallQueue from "./RecallQueue";
+import RecallWorkspace from "./RecallWorkspace";
 
-// Local Component: Read-Only Queue Card (Lightweight)
-function RecallQueueCard({ snippet, isActive, onClick }) {
-    const dateStr = snippet.createdAtReadable ? snippet.createdAtReadable.split(" ")[0] : "New";
-
-    return (
-        <div
-            className={`recall-queue-card ${isActive ? "active" : ""}`}
-            onClick={onClick}
-        >
-            <div className="recall-card-header">
-                <span className="recall-card-topic">{snippet.topic || "No Topic"}</span>
-                <span className="recall-card-date">{dateStr}</span>
-            </div>
-            <h4 className="recall-card-title">{snippet.title || "Untitled Snippet"}</h4>
-
-            <div className="recall-card-footer">
-                {snippet.recallStreak > 0 && (
-                    <span className="recall-streak-badge">
-                        <Trophy size={12} /> {snippet.recallStreak}
-                    </span>
-                )}
-                {snippet.lastFeedback === "revisit" && (
-                    <span className="recall-status-revisit">
-                        <RotateCcw size={12} /> Revisit
-                    </span>
-                )}
-            </div>
-        </div>
-    );
-}
-
-// Local Component: Accordion for AI Notes
-function NoteAccordion({ title, content, icon: Icon, defaultOpen = false }) {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
-
-    // If content is missing, don't render
-    if (!content) return null;
-
-    return (
-        <div className={`note-accordion ai-note-block`}>
-            <button
-                className={`accordion-header ${isOpen ? "open" : ""}`}
-                onClick={() => setIsOpen(!isOpen)}
-            >
-                <div className="accordion-title-row">
-                    {Icon && <Icon size={18} className="accordion-icon" />}
-                    <span>{title}</span>
-                </div>
-                {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </button>
-            {isOpen && (
-                <div className="accordion-content">
-                    <div className="markdown-body">
-                        <ReactMarkdown>
-                            {Array.isArray(content) ? content.join('\n') : (typeof content === 'string' ? content : String(content || ''))}
-                        </ReactMarkdown>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
+/**
+ * RecallMode Component - Refactored for decomposition and optimization.
+ * Manages the Spaced Repetition logic and orchestrates sub-components.
+ */
 function RecallMode({ snippets = [], onNavigate, onUpdate }) {
     const { user } = useAuth();
 
-    // State
+    // -- State --
     const [recallQueue, setRecallQueue] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
     const [isCodeRevealed, setIsCodeRevealed] = useState(false);
     const [statsSaving, setStatsSaving] = useState(false);
     const [generatingNotes, setGeneratingNotes] = useState(false);
 
-    // Derived: Current Active Snippet
+    // -- Derived: Current Active Snippet (Optimized with useMemo) --
     const currentSnippet = useMemo(() =>
         recallQueue.find(s => s.id === selectedId),
         [recallQueue, selectedId]);
 
-    // Derived: Session Stats (Persisted via Snippets)
+    // -- Derived: Session Stats (Optimized with useMemo) --
     const reviewedTodayCount = useMemo(() => {
         if (!snippets.length) return 0;
         const now = new Date();
@@ -104,9 +37,7 @@ function RecallMode({ snippets = [], onNavigate, onUpdate }) {
         }).length;
     }, [snippets]);
 
-    // -------------------------------------------
-    // 1. ALGORITHM: Build Queue on Mount
-    // -------------------------------------------
+    // -- Effect: Build Queue on Mount --
     useEffect(() => {
         if (!snippets || snippets.length === 0) return;
 
@@ -115,79 +46,56 @@ function RecallMode({ snippets = [], onNavigate, onUpdate }) {
 
         // 1. Exclude reviewed TODAY
         const eligible = snippets.filter(s => {
-            if (!s.lastRecalledAt?.seconds) return true; // Never recalled = Eligible
-
+            if (!s.lastRecalledAt?.seconds) return true;
             const lastDate = new Date(s.lastRecalledAt.seconds * 1000);
             const lastDateStr = lastDate.toDateString();
-
             return lastDateStr !== todayStr;
         });
 
-        // 2. Prioritize (Calculate Scores)
+        // 2. Prioritize Logic
         const scored = eligible.map(s => {
             let daysSince = 0;
-
-            // A. Days Since Last Review
             if (!s.lastRecalledAt?.seconds) {
-                // NEVER reviewed -> Treat as very old (High Priority)
                 daysSince = 999;
             } else {
                 const lastDate = new Date(s.lastRecalledAt.seconds * 1000);
                 const diffTime = Math.abs(now - lastDate);
                 daysSince = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             }
-
-            // B. Stats
-            const revisitCount = s.revisitCount || 0;
-            const understoodCount = s.understoodCount || 0;
-
-            // C. FORMULA
-            // Score = (daysSince * 2) + (revisitCount * 2) - understoodCount
-            // Logic: 
-            // - Old items (high days) -> Boost
-            // - Hard items (high revisit) -> Boost
-            // - Mastered items (high understood) -> Penalty
-            let priority = (daysSince * 2) + (revisitCount * 2) - understoodCount;
-
+            const priority = (daysSince * 2) + (s.revisitCount || 0) * 2 - (s.understoodCount || 0);
             return { ...s, selectionPriority: priority };
         });
 
-        // Sort by Priority Descending
+        // Sort and select top 10
         scored.sort((a, b) => b.selectionPriority - a.selectionPriority);
-
-        // 3. Select Top 10
-        // We pick top 10 regardless of topic diversity for now to ensure "hardest" come first
-        // But we can add a slight diversity check if needed later.
         const selected = scored.slice(0, 10);
 
         setRecallQueue(selected);
-
         if (selected.length > 0) {
             setSelectedId(selected[0].id);
         }
-
     }, [snippets]);
 
-    // -------------------------------------------
-    // 2. ACTIONS
-    // -------------------------------------------
-    const handleSelect = (id) => {
+    // -- Handlers (Optimized with useCallback) --
+    
+    const handleSelect = useCallback((id) => {
         setSelectedId(id);
         setIsCodeRevealed(false);
-    };
+    }, []);
 
-    const handleFeedback = async (isUnderstood) => {
+    const handleToggleReveal = useCallback((reveal) => {
+        setIsCodeRevealed(reveal);
+    }, []);
+
+    const handleFeedback = useCallback(async (isUnderstood) => {
         if (!currentSnippet || !user) return;
 
         setStatsSaving(true);
         const snippetId = currentSnippet.id;
 
         try {
-            // 1. Persist to DB
             await updateSnippetRecall(user.uid, snippetId, isUnderstood);
 
-            // 2. Optimistic Update for Parent (Dashboard)
-            // We need to match Firestore Timestamp format { seconds, ... } so filters work
             const nowSeconds = Math.floor(Date.now() / 1000);
             const optimisticSnippet = {
                 ...currentSnippet,
@@ -197,32 +105,31 @@ function RecallMode({ snippets = [], onNavigate, onUpdate }) {
                 recallCount: (currentSnippet.recallCount || 0) + 1
             };
 
-            if (onUpdate) {
-                onUpdate(optimisticSnippet);
-            }
+            if (onUpdate) onUpdate(optimisticSnippet);
 
-            // 3. Remove from Local Queue
-            setRecallQueue(prev => prev.filter(s => s.id !== snippetId));
-
-            // 4. Select Next
-            const nextQueue = recallQueue.filter(s => s.id !== snippetId);
-            if (nextQueue.length > 0) {
-                setSelectedId(nextQueue[0].id);
-            } else {
-                setSelectedId(null);
-            }
+            // Update local state queue
+            setRecallQueue(prev => {
+                const nextQueue = prev.filter(s => s.id !== snippetId);
+                // Auto-select next item if available
+                if (nextQueue.length > 0 && selectedId === snippetId) {
+                    setSelectedId(nextQueue[0].id);
+                } else if (nextQueue.length === 0) {
+                    setSelectedId(null);
+                }
+                return nextQueue;
+            });
 
             setIsCodeRevealed(false);
 
         } catch (error) {
-            console.error("Feedback failed:", error);
+            console.error("[Recall Feedback Error]", error);
             alert("Failed to save progress. Please try again.");
         } finally {
             setStatsSaving(false);
         }
-    };
+    }, [currentSnippet, user, onUpdate, selectedId]);
 
-    const handleGenerateNotes = async () => {
+    const handleGenerateNotes = useCallback(async () => {
         if (!currentSnippet || !user) return;
         setGeneratingNotes(true);
 
@@ -233,40 +140,27 @@ function RecallMode({ snippets = [], onNavigate, onUpdate }) {
                 currentSnippet.topic
             );
 
-            // Save to DB
             await updateSnippetAI(user.uid, currentSnippet.id, notesData, "success");
 
-            // Update local state by forcing a re-render or updating current object
-            // Ideally parent updates snippets, but for now we hack it locally?
-            // Actually, `snippets` prop will update if Dashboard updates.
-            // But we need to update `recallQueue` too.
-            const updatedSnippet = { ...currentSnippet, aiNotes: notesData.aiNotes, aiStatus: "success" };
+            const updatedSnippet = { 
+                ...currentSnippet, 
+                aiNotes: notesData.aiNotes, 
+                aiStatus: "success" 
+            };
 
-            setRecallQueue(prev => prev.map(s => s.id === currentSnippet.id ? updatedSnippet : s));
+            setRecallQueue(prev => 
+                prev.map(s => s.id === currentSnippet.id ? updatedSnippet : s)
+            );
 
         } catch (error) {
-            console.error("Failed to generate notes:", error);
-            alert("Failed to generate notes. " + error.message);
+            console.error("[Recall Notes Error]", error);
+            alert("Failed to generate notes: " + error.message);
         } finally {
             setGeneratingNotes(false);
         }
-    };
+    }, [currentSnippet, user]);
 
-    // -------------------------------------------
-    // 3. HELPER: Note Sections Configuration
-    // -------------------------------------------
-    const NOTE_SECTIONS = [
-        { key: "problem", title: "Problem Statement", icon: AlertCircle, defaultOpen: true },
-        { key: "intuition", title: "Intuition", icon: Zap, defaultOpen: true },
-        { key: "approach", title: "Approach", icon: Target, defaultOpen: true },
-        { key: "timeComplexity", title: "Time Complexity", icon: Clock },
-        { key: "spaceComplexity", title: "Space Complexity", icon: HardDrive },
-        { key: "edgeCases", title: "Edge Cases", icon: AlertTriangle }
-    ];
-
-    // -------------------------------------------
-    // 4. RENDER: COMPLETION VIEW
-    // -------------------------------------------
+    // -- Completion View --
     if (recallQueue.length === 0) {
         if (snippets.length === 0) {
             return (
@@ -296,7 +190,7 @@ function RecallMode({ snippets = [], onNavigate, onUpdate }) {
 
                     <button
                         className="std-btn-primary"
-                        onClick={() => onNavigate ? onNavigate("snippets") : window.history.back()}
+                        onClick={() => onNavigate("snippets")}
                     >
                         Return to Snippets
                     </button>
@@ -305,183 +199,26 @@ function RecallMode({ snippets = [], onNavigate, onUpdate }) {
         );
     }
 
-    // CHECK FOR NOTES EXISTENCE
-    const hasNotes = currentSnippet && currentSnippet.aiNotes && (
-        currentSnippet.aiNotes.problem ||
-        currentSnippet.aiNotes.intuition ||
-        currentSnippet.aiNotes.approach ||
-        currentSnippet.aiNotes.explanation
-    );
-
-    // -------------------------------------------
-    // 5. RENDER: MAIN LAYOUT
-    // -------------------------------------------
     return (
         <div className="recall-page">
-            {/* Left Panel: Queue */}
-            <div className="recall-queue-panel">
-                <div className="panel-header">
-                    <h3>Recall Queue</h3>
-                    <span className="queue-count">{recallQueue.length}</span>
-                </div>
-                <div className="queue-list">
-                    {recallQueue.map(item => (
-                        <RecallQueueCard
-                            key={item.id}
-                            snippet={item}
-                            isActive={item.id === selectedId}
-                            onClick={() => handleSelect(item.id)}
-                        />
-                    ))}
-                </div>
-            </div>
-
-            {/* Right Panel: Workspace */}
-            <div className="recall-workspace">
-                {currentSnippet ? (
-                    <div className="workspace-container">
-                        {/* Header */}
-                        <div className="recall-header">
-                            <div className="recall-meta-row">
-                                <span className="recall-topic-badge">{currentSnippet.topic}</span>
-                                <span className="recall-date">
-                                    <Clock size={12} /> {currentSnippet.createdAtReadable}
-                                </span>
-                            </div>
-                            <h1 className="recall-title">{currentSnippet.title}</h1>
-
-                            {/* Tags */}
-                            <div className="tag-row" style={{ marginTop: '0.5rem' }}>
-                                {currentSnippet.tags?.map(t => (
-                                    <span key={t} className="snippet-tag tag-user">{t}</span>
-                                ))}
-                                {currentSnippet.aiTags?.map(t => (
-                                    <span key={t} className="snippet-tag tag-ai"><Sparkles size={10} />{t}</span>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Content: AI Notes or CTA */}
-                        <div className="recall-notes-section">
-                            {hasNotes ? (
-                                <>
-                                    {NOTE_SECTIONS.map(section => {
-                                        const content = currentSnippet.aiNotes[section.key];
-                                        if (content) {
-                                            return (
-                                                <NoteAccordion
-                                                    key={section.key}
-                                                    title={section.title}
-                                                    content={content}
-                                                    icon={section.icon}
-                                                    defaultOpen={section.defaultOpen}
-                                                />
-                                            );
-                                        }
-                                        return null;
-                                    })}
-
-                                    {/* Legacy Fallback */}
-                                    {!currentSnippet.aiNotes.problem && currentSnippet.aiNotes.explanation && (
-                                        <NoteAccordion
-                                            title="Explanation"
-                                            content={currentSnippet.aiNotes.explanation}
-                                            icon={BookOpen}
-                                            defaultOpen={true}
-                                        />
-                                    )}
-                                </>
-                            ) : (
-                                <div className="no-notes-cta">
-                                    <div className="cta-content">
-                                        <Sparkles size={32} className="cta-icon" />
-                                        <h3>Missing AI Notes</h3>
-                                        <p>This snippet doesn't have AI notes yet. Generate them to enable effective recall.</p>
-                                        <button
-                                            className="std-btn-primary"
-                                            onClick={handleGenerateNotes}
-                                            disabled={generatingNotes}
-                                        >
-                                            {generatingNotes ? (
-                                                <><RefreshCw className="spinning" size={16} /> Generating...</>
-                                            ) : (
-                                                <><Sparkles size={16} /> Generate Notes</>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Code Section (Hidden by Default) */}
-                        <div className="recall-code-section">
-                            {!isCodeRevealed ? (
-                                <div className="code-blur-overlay">
-                                    <div className="blur-content">
-                                        <Lock size={32} className="lock-icon" />
-                                        <p>Try to recall the code implementation.</p>
-                                        <button
-                                            className="std-btn-primary reveal-btn"
-                                            onClick={() => setIsCodeRevealed(true)}
-                                            style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}
-                                        >
-                                            <Eye size={16} /> Reveal Code
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="code-revealed-container">
-                                    <div className="code-actions-bar">
-                                        <span className="label">Implementation</span>
-                                        <button
-                                            className="std-btn-outline"
-                                            onClick={() => setIsCodeRevealed(false)}
-                                        >
-                                            <EyeOff size={14} /> Hide
-                                        </button>
-                                    </div>
-                                    <SyntaxHighlighter
-                                        language="javascript"
-                                        style={vscDarkPlus}
-                                        showLineNumbers={true}
-                                        customStyle={{ margin: 0, borderRadius: '8px', fontSize: '0.9rem' }}
-                                    >
-                                        {currentSnippet.code}
-                                    </SyntaxHighlighter>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Feedback Actions */}
-                        <div className="recall-actions-footer">
-                            <p className="feedback-prompt">How well did you recall this?</p>
-                            <div className="feedback-buttons">
-                                <button
-                                    className="recall-btn btn-revisit"
-                                    onClick={() => handleFeedback(false)}
-                                    disabled={statsSaving}
-                                >
-                                    <RotateCcw size={18} /> Revisit Later
-                                </button>
-                                <button
-                                    className="recall-btn btn-understood"
-                                    onClick={() => handleFeedback(true)}
-                                    disabled={statsSaving}
-                                >
-                                    <CheckCircle size={18} /> I Understood
-                                </button>
-                            </div>
-                        </div>
-
-                    </div>
-                ) : (
-                    <div className="empty-selection">
-                        <p>Select a snippet to start recalling.</p>
-                    </div>
-                )}
-            </div>
+            <RecallQueue 
+                queue={recallQueue} 
+                selectedId={selectedId} 
+                onSelect={handleSelect} 
+            />
+            
+            <RecallWorkspace 
+                snippet={currentSnippet}
+                isCodeRevealed={isCodeRevealed}
+                onToggleReveal={handleToggleReveal}
+                onFeedback={handleFeedback}
+                onGenerateNotes={handleGenerateNotes}
+                generatingNotes={generatingNotes}
+                statsSaving={statsSaving}
+            />
         </div>
     );
 }
 
 export default RecallMode;
+
