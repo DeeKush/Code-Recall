@@ -1,14 +1,20 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { generateSnippetMetadata } from "../utils/groq";
+import { generateSnippetMetadata } from "../services/groqService";
 import HomeHeader from "./HomeHeader";
 import RecentSnippetsStrip from "./RecentSnippetsStrip";
 import RecallCTA from "./RecallCTA";
 import CreateSnippetLeft from "./CreateSnippetLeft";
 import CreateSnippetRight from "./CreateSnippetRight";
 
+/**
+ * DashboardHome Component - The 'Create' area of the dashboard.
+ * Refactored for clean routing and better state management.
+ */
 function DashboardHome({ onSnippetCreated, snippets, onNavigate }) {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [saving, setSaving] = useState(false);
     const [analyzing, setAnalyzing] = useState(false);
     const [showReview, setShowReview] = useState(false);
@@ -21,31 +27,25 @@ function DashboardHome({ onSnippetCreated, snippets, onNavigate }) {
         tags: []
     });
 
-    const updateData = (updates) => {
+    const updateData = useCallback((updates) => {
         setSnippetData(prev => ({ ...prev, ...updates }));
-    };
+    }, []);
 
-    const handleCodeChange = (newCode) => {
+    const handleCodeChange = useCallback((newCode) => {
         updateData({ code: newCode });
-    };
+    }, [updateData]);
 
-    const handleMetadataChange = (updates) => {
+    const handleMetadataChange = useCallback((updates) => {
         updateData(updates);
-    };
+    }, [updateData]);
 
     const handleAnalyze = async () => {
-        if (!snippetData.code.trim()) {
-            alert("Please paste some code.");
-            return;
-        }
-
-        if (snippetData.code.trim().length < 20) {
-            alert("Please enter more code (at least 20 characters).");
+        if (!snippetData.code.trim() || snippetData.code.trim().length < 20) {
+            alert("Please enter more code (at least 20 characters) for better analysis.");
             return;
         }
 
         setAnalyzing(true);
-
         try {
             const metadata = await generateSnippetMetadata(snippetData.code);
             updateData({
@@ -56,7 +56,6 @@ function DashboardHome({ onSnippetCreated, snippets, onNavigate }) {
             setShowReview(true);
         } catch (error) {
             console.error("Analysis failed:", error);
-            updateData({ title: "", topic: "", tags: [] });
             setShowReview(true);
         } finally {
             setAnalyzing(false);
@@ -68,28 +67,26 @@ function DashboardHome({ onSnippetCreated, snippets, onNavigate }) {
         setSaving(true);
         try {
             const newId = await onSnippetCreated(snippetData);
+            if (newId) {
+                // Navigate to snippets view with the new snippet selected
+                navigate(`/dashboard/snippets?id=${newId}`);
+            }
             setSnippetData({ code: "", title: "", topic: "", tags: [] });
             setShowReview(false);
-
-            if (newId) {
-                window.history.pushState(null, "", `/snippets?id=${newId}`);
-                onNavigate("snippets");
-            }
         } catch (error) {
-            console.error("Failed to save snippet:", error);
+            console.error("Save Error:", error);
         } finally {
             setSaving(false);
         }
     };
 
-    const handleCancel = () => {
+    const handleCancel = useCallback(() => {
         setShowReview(false);
-    };
+    }, []);
 
-    const handleRecentSelect = (snippet) => {
-        window.history.pushState(null, "", `/snippets?id=${snippet.id}`);
-        onNavigate("snippets");
-    };
+    const handleRecentSelect = useCallback((snippet) => {
+        navigate(`/dashboard/snippets?id=${snippet.id}`);
+    }, [navigate]);
 
     return (
         <div className="home-dashboard-container">
