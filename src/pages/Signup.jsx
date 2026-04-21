@@ -1,25 +1,21 @@
-// ==========================================
-// SIGNUP COMPONENT (Day 4 - Dark Theme)
-// ==========================================
-// Dark themed signup form with:
-//   - Email/password registration
-//   - Google Sign-In
-//   - Back to home link
-// ==========================================
-
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "../firebase";
+import { auth, googleProvider } from "../services/firebase";
 import { Brain, Mail, Lock, ArrowLeft } from "lucide-react";
 
-function Signup({ onSwitchToLogin, onBackToHome }) {
+/**
+ * Signup Component - Refactored for React Router v6.
+ */
+function Signup() {
+    const navigate = useNavigate();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    async function handleSubmit(e) {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
 
@@ -37,20 +33,22 @@ function Signup({ onSwitchToLogin, onBackToHome }) {
 
         try {
             await createUserWithEmailAndPassword(auth, email, password);
+            // Redirection handled by ProtectedRoute
         } catch (err) {
+            console.error("Signup Error:", err);
             setError(getErrorMessage(err.code));
         } finally {
             setLoading(false);
         }
-    }
+    };
 
-    async function handleGoogleSignIn() {
+    const handleGoogleSignIn = async () => {
         setError("");
         setLoading(true);
-
         try {
             await signInWithPopup(auth, googleProvider);
         } catch (err) {
+            console.error("Google Auth Error:", err);
             if (err.code === "auth/popup-closed-by-user") {
                 setError("Sign-in cancelled.");
             } else {
@@ -59,18 +57,14 @@ function Signup({ onSwitchToLogin, onBackToHome }) {
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     function getErrorMessage(code) {
         switch (code) {
-            case "auth/email-already-in-use":
-                return "An account with this email already exists.";
-            case "auth/invalid-email":
-                return "Invalid email address.";
-            case "auth/weak-password":
-                return "Password is too weak. Use at least 6 characters.";
-            default:
-                return "Failed to create account. Please try again.";
+            case "auth/email-already-in-use": return "An account with this email already exists.";
+            case "auth/invalid-email": return "Invalid email address.";
+            case "auth/weak-password": return "Password is too weak. Use at least 6 characters.";
+            default: return "Failed to create account. Please try again.";
         }
     }
 
@@ -78,12 +72,10 @@ function Signup({ onSwitchToLogin, onBackToHome }) {
         <div className="auth-page-dark">
             <div className="auth-container-dark">
                 {/* Back button */}
-                {onBackToHome && (
-                    <button onClick={onBackToHome} className="auth-back-btn">
-                        <ArrowLeft size={18} />
-                        <span>Back</span>
-                    </button>
-                )}
+                <button onClick={() => navigate("/")} className="auth-back-btn">
+                    <ArrowLeft size={18} />
+                    <span>Back</span>
+                </button>
 
                 {/* Logo */}
                 <div className="auth-logo-dark">
@@ -163,7 +155,7 @@ function Signup({ onSwitchToLogin, onBackToHome }) {
 
                 <p className="auth-switch-dark">
                     Already have an account?{" "}
-                    <button onClick={onSwitchToLogin} className="btn-link-dark">
+                    <button onClick={() => navigate("/login")} className="btn-link-dark">
                         Sign in
                     </button>
                 </p>
@@ -173,3 +165,4 @@ function Signup({ onSwitchToLogin, onBackToHome }) {
 }
 
 export default Signup;
+
