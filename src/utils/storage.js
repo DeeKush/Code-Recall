@@ -5,7 +5,7 @@
 // Migrated from localStorage to cloud storage for better persistence.
 // ==========================================
 
-import { db } from "../firebase";
+import { db } from "../services/firebase";
 import {
     collection,
     addDoc,
